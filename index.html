@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Zeiterfassung</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.27/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+        }
+        .action-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .status { 
+             margin-top: 15px; padding: 16px; border-radius: 12px; text-align: center; font-size: 1.2em; font-weight: 600;
+             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        .status.working { 
+            background-color: #10b98120; color: #10b981; border: 2px solid #059669; 
+        }
+        .status.paused { 
+            background-color: #f59e0b20; color: #f59e0b; border: 2px solid #d97706; 
+        }
+        .status.stopped { 
+            background-color: #ef444420; color: #ef4444; border: 2px solid #b91c1c; 
+        }
+        .zeit { 
+            background-color: #374151; color: #fcd34d; padding: 16px; border-radius: 12px; text-align: center; font-size: 1.5em; font-weight: 700; margin-top: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        .summary-shift {
+            background-color: #374151; padding: 12px; border-radius: 8px; border-left: 4px solid #fcd34d; 
+        }
+        .current-shift {
+            background-color: #1f2937; 
+            border: 2px solid #fcd34d; 
+            box-shadow: 0 4px 10px rgba(252, 211, 77, 0.3);
+            order: -1; 
+        }
+        .action-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background-color: #4b5563;
+        }
+        .share-button-container {
+             display: flex;
+             justify-content: flex-end; 
+             margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center p-4 sm:p-6">
+    
+    <div class="w-full max-w-lg mx-auto">
+        
+        <header class="text-center mb-6">
+            <h1 class="text-4xl font-bold text-yellow-400">⏱️ Mobile Zeiterfassung</h1>
+            <p class="text-gray-400 mt-2">Ihre Arbeitszeit und Protokoll auf einen Blick.</p>
+        </header>
+
+        <div class="bg-gray-800 p-6 rounded-2xl shadow-lg mb-6 space-y-4">
+            
+            <div>
+                <label for="fahrername" class="block text-sm font-medium text-gray-300 mb-1">Fahrer/Mitarbeiter</label>
+                <input type="text" id="fahrername" placeholder="Ihr Name" 
+                       class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition">
+            </div>
+
+            <div>
+                <label for="kennzeichen" class="block text-sm font-medium text-gray-300 mb-1">Fahrzeug (Kennzeichen)</label>
+                <select id="kennzeichen" 
+                        class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition appearance-none">
+                    <option value="" disabled selected class="text-gray-500">Kennzeichen auswählen...</option>
+                </select>
+            </div>
+            
+            <div id="status" class="status stopped">Gestoppt</div>
+            
+            <div id="uhr" class="zeit">00:00:00 (Nettozeit heute)</div>
+
+            <div class="flex justify-between gap-4 pt-2">
+                <button id="btnStartStop" onclick="startStopTracking()" 
+                        class="action-btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg text-lg">
+                    Starten / Stoppen
+                </button>
+                <button id="btnPause" onclick="togglePause()" 
+                        class="action-btn w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 rounded-lg text-lg" disabled>
+                    Pause
+                </button>
+            </div>
+            
+            
+            <button id="btnMonthSummary" onclick="createMonthSummary()" 
+                    class="action-btn w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg mt-4" disabled>
+                Monatsabrechnung [Monatsname] erstellen (PDF)
+            </button>
+            <p id="summary-info" class="text-sm text-gray-400 text-center mt-2"></p>
+            
+            
+            <div class="pt-4 border-t border-gray-700 mt-4 space-y-3" id="archive-section">
+                <h3 class="text-lg font-semibold text-yellow-400">Historische Monatsdaten (Archiv)</h3>
+                 <div>
+                    <select id="archive-select" 
+                            class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition appearance-none">
+                        <option value="" disabled selected class="text-gray-500">Abrechnungen auswählen...</option>
+                    </select>
+                </div>
+                <button id="btnRecreatePdf" onclick="recreatePdfFromArchive()" disabled
+                        class="action-btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg">
+                    PDF erneut erstellen
+                </button>
+            </div>
+        </div>
+        
+        <div class="bg-gray-800 p-6 rounded-2xl shadow-lg mt-8">
+            <h2 class="text-2xl font-semibold mb-4 text-yellow-400">Gespeicherte Schichten</h2>
+            <div id="shift-summary-list" class="space-y-3 max-h-96 overflow-y-auto pr-2 flex flex-col">
+                 <p class="text-gray-400">Noch keine abgeschlossenen Schichten gespeichert.</p>
+            </div>
+        </div>
+
+        <div class="pt-6 mt-2">
+            <button id="btnDeleteAllData" onclick="deleteAllData()" 
+                    class="action-btn w-full bg-red-900 hover:bg-red-700 text-white font-black py-3 rounded-lg text-sm uppercase flex items-center justify-center space-x-2">
+                <span class="text-xl">⚠️</span><span>ALLE SCHICHTDATEN LÖSCHEN</span><span class="text-xl">⚠️</span>
+            </button>
+        </div>
+
+
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+
+        // --- LocalStorage Keys ---
+        const NAME_KEY = 'fahrername';           
+        const SHIFTS_KEY = 'zeitlog_shifts';     
+        const STATE_KEY = 'timer_state';         
+        const KENNZEICHEN_KEY = 'current_kennzeichen'; 
+        // const TEST_DATE_KEY = 'test_date_active'; // ENTFERNT
+        const ARCHIVED_MONTHS_KEY = 'archived_months'; 
+        
+        // KENNZEICHENLISTE
+        const KENNZEICHEN = ["WR-TP 11", "WR-TP 60", "WR-TP 75", "WR-TP 100", "WR-TP 103", "WR-TP 104", "WR-TP 105", "WR-TP 106", "WR-TP 111", "WR-TP 112", "WR-TP 119", "WR-TP 316", "WR-TP 444", "WR-TP 557", "WR-TP 667"];
+        
+
+
+        // --- DOM-Elemente ---
+        const fahrernameInput = document.getElementById('fahrername');
+        const kennzeichenSelect = document.getElementById('kennzeichen');
+        const uhrEl = document.getElementById('uhr');
+        const statusDiv = document.getElementById('status');
+        const btnStartStop = document.getElementById('btnStartStop');
+        const btnPause = document.getElementById('btnPause');
+        const btnMonthSummary = document.getElementById('btnMonthSummary'); 
+        const summaryInfo = document.getElementById('summary-info');
+        // const btnToggleTestDate = document.getElementById('btnToggleTestDate'); // ENTFERNT
+        const archiveSelect = document.getElementById('archive-select');
+        const btnRecreatePdf = document.getElementById('btnRecreatePdf');
+        // const btnShareApp = document.getElementById('btnShareApp'); // ENTFERNT
+
+        // --- Globaler Zustand ---
+        let state = loadState();
+        let timer = null;
+        // let isTestDateActive = localStorage.getItem(TEST_DATE_KEY) === 'true'; // ENTFERNT
+
+        function loadState() {
+            const defaultState = { isWorking: false, isPaused: false, startTime: null, pauseTime: 0, pauseStart: null, log: [] };
+            try {
+                const storedState = JSON.parse(localStorage.getItem(STATE_KEY));
+                if (storedState && storedState.startTime) storedState.startTime = Number(storedState.startTime);
+                if (storedState && storedState.pauseStart) storedState.pauseStart = Number(storedState.pauseStart);
+                if (storedState && !storedState.isPaused && storedState.pauseStart !== null) storedState.pauseStart = null;
+                return storedState ? { ...defaultState, ...storedState } : defaultState;
+            } catch (e) {
+                return defaultState;
+            }
+        }
+        
+        function saveState() {
+            localStorage.setItem(STATE_KEY, JSON.stringify(state));
+        }
+        
+        // --- HILFSFUNKTIONEN FÜR DATUM & MONAT ---
+
+        /**
+         * Gibt das aktuelle (reale) Datum zurück.
+         */
+        function getCurrentDate() {
+            return new Date();
+        }
+        
+        /**
+         * Gibt den Key und den Namen des Vormonats, basierend auf dem REALEN Datum, zurück.
+         */
+        function getPreviousMonthKeyInfo(baseDate = new Date()) {
+            const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
+            const year = prevDate.getFullYear();
+            const month = String(prevDate.getMonth() + 1).padStart(2, '0');
+            
+            const monthName = prevDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+
+            return { 
+                key: `${year}-${month}`, 
+                monthName: monthName,
+                date: prevDate 
+            };
+        }
+
+        // function toggleTestDate() { ... } // ENTFERNT
+
+        // --- HILFSFUNKTIONEN ---
+
+        function formatTime(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+            const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+            return `${h}:${m}`; 
+        }
+        
+        function formatTimeDetailed(ms) {
+             const totalSeconds = Math.floor(ms / 1000);
+             const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+             const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+             const s = String(totalSeconds % 60).padStart(2, '0');
+             return `${h}:${m}:${s}`;
+        }
+
+        function logAction(action, time) {
+            const logEntry = { action: action, time: time.valueOf(), timestamp: time.toLocaleString("de-DE") };
+            state.log.push(logEntry);
+            saveState();
+        }
+
+        /**
+         * Prüft, ob Monatsabrechnung erlaubt ist (1. des Monats erreicht).
+         */
+        function isPreviousMonthCompleted() {
+            const today = getCurrentDate(); 
+            return today.getDate() === 1; 
+        }
+
+        function getCurrentMonthKey() {
+            const today = new Date(); 
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            return `${year}-${month}`;
+        }
+        
+        /**
+         * Konvertiert Monats-Key (YYYY-MM) in Monatsnamen (März 2024).
+         */
+        function monthKeyToName(monthKey) {
+             const [year, month] = monthKey.split('-');
+             const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+             return date.toLocaleDateString("de-DE", { month: 'long', year: 'numeric' });
+        }
+        
+        // --- SIMULATION: Testdaten generieren (ENTFERNT) ---
+        // function generateTestShiftsForPreviousMonth() { ... } 
+        
+        // --- Archiv Test-Eintrag (ENTFERNT) ---
+        // function addTestArchiveEntry() { ... } 
+
+
+        // --- PDF-FUNKTIONEN ---
+        
+        async function createMonthSummaryPDF(shiftsToExport, monthInfo) {
+            const doc = new jsPDF();
+            const fahrerName = fahrernameInput.value || "Unbekannt";
+            let totalNetTimeMs = 0;
+            let totalBruttoTimeMs = 0;
+            let totalPauseTimeMs = 0;
+            
+            shiftsToExport.sort((a, b) => a.startTime - b.startTime);
+
+            // Daten vorbereiten und Gesamtzeiten berechnen
+            const tableRows = shiftsToExport.map(shift => {
+                const startDateTime = new Date(shift.startTime);
+                const endEntry = shift.log.slice().reverse().find(e => e.action.startsWith('Arbeitsende')); 
+                const endDateTime = endEntry ? new Date(endEntry.time) : null;
+                
+                const bruttoTimeMs = endDateTime ? endDateTime.valueOf() - startDateTime.valueOf() : 0;
+                const pauseTimeMs = bruttoTimeMs - shift.netTime;
+                
+                totalNetTimeMs += shift.netTime;
+                totalBruttoTimeMs += bruttoTimeMs;
+                totalPauseTimeMs += pauseTimeMs;
+
+                const schichtID = shift.kennzeichen; 
+                const bemerkungenText = shift.bemerkungen || ""; 
+
+                return [
+                    startDateTime.toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit', weekday: 'short' }), 
+                    schichtID, 
+                    startDateTime.toLocaleTimeString("de-DE", { hour: '2-digit', minute: '2-digit' }), 
+                    endDateTime ? endDateTime.toLocaleTimeString("de-DE", { hour: '2-digit', minute: '2-digit' }) : 'N/A', 
+                    formatTime(bruttoTimeMs), 
+                    formatTime(pauseTimeMs), 
+                    formatTime(shift.netTime), 
+                    bemerkungenText 
+                ];
+            });
+
+            // Tabelle definieren (8 Spaltennamen)
+            const tableColumn = ["Datum", "Schicht", "Von", "Bis", "Brutto", "Pause", "Netto", "Bemerkungen"];
+            const headerStart = 10;
+            const titleStart = 30;
+
+            // --- KOPFZEILE ---
+            doc.setFontSize(10);
+            doc.text("Taxi Pfeiffer", 14, headerStart);
+            doc.text("Westerhäuser Landstr. 17", 14, headerStart + 5); 
+            doc.text("38889 Blankenburg", 14, headerStart + 10); 
+
+            // Stundenabrechnungstitel
+            doc.setFontSize(12);
+            doc.text(`Stundenabrechnung von ${fahrerName} für den Monat:`, 14, titleStart);
+            
+            // Monatsname und Datumsbereich
+            doc.setFontSize(14);
+            doc.text(monthInfo.monthName, 14, titleStart + 5); 
+            doc.setFontSize(10);
+            doc.text(`01.${monthInfo.key.substring(5, 7)}.${monthInfo.key.substring(0, 4)} - 31.${monthInfo.key.substring(5, 7)}.${monthInfo.key.substring(0, 4)}`, 14, titleStart + 10);
+
+            // Fußzeile (Gesamt) definieren
+            const tableFoot = [
+                [
+                    { content: "GESAMT:", colSpan: 4, styles: { halign: 'left' } }, 
+                    { content: formatTime(totalBruttoTimeMs) }, 
+                    { content: formatTime(totalPauseTimeMs) }, 
+                    { content: formatTime(totalNetTimeMs) },
+                    "" 
+                ]
+            ];
+            
+            const tableStartY = 50; 
+
+            // --- Tabelle hinzufügen ---
+            doc.autoTable({
+                head: [tableColumn],
+                body: tableRows,
+                foot: tableFoot,
+                startY: tableStartY,
+                headStyles: { fillColor: [220, 230, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+                footStyles: {
+                    fillColor: [55, 65, 81], 
+                    textColor: [252, 211, 77], 
+                    fontStyle: 'bold', 
+                    fontSize: 9, 
+                    halign: 'center' 
+                },
+                styles: { fontSize: 9, cellPadding: 2, lineWidth: 0.1, lineColor: 0 },
+                columnStyles: {
+                    0: { cellWidth: 22 }, 
+                    1: { cellWidth: 20 }, 
+                    2: { cellWidth: 14 }, 
+                    3: { cellWidth: 14 }, 
+                    4: { cellWidth: 15, halign: 'center' }, 
+                    5: { cellWidth: 15, halign: 'center' }, 
+                    6: { cellWidth: 15, halign: 'center' }, 
+                    7: { cellWidth: 25 } 
+                },
+                margin: { top: 10 }
+            });
+            
+            const finalY = doc.autoTable.previous.finalY || tableStartY + 10;
+
+            // Unterschriftenfelder
+            doc.setFontSize(10);
+            doc.setTextColor(0); 
+            
+            doc.text("Datum und Unterschrift Arbeitgeber", 14, finalY + 30);
+            
+            const sigText = "Datum und Unterschrift Arbeitnehmer";
+            const pageWidth = doc.internal.pageSize.getWidth();
+            doc.text(sigText, pageWidth - 14, finalY + 30, { align: 'right' });
+
+            const pdfBlob = doc.output('blob');
+            return pdfBlob;
+        }
+
+        // --- HILFSFUNKTION: NUR DOWNLOAD ---
+        function initiateDownload(fileBlob, fileName) {
+            const url = URL.createObjectURL(fileBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --- TEILEN-FUNKTION (ENTFERNT) ---
+        // function shareAppFile() { ... }
+
+        // --- HAUPTFUNKTION: Monatsabrechnung erstellen ---
+
+        async function createMonthSummary() {
+            
+             console.log("-> Monatsabrechnung gestartet.");
+             
+             if (!isPreviousMonthCompleted()) {
+                 alert("Aktion nicht möglich: Die Abrechnung ist nur ab dem 1. Tag des Monats erlaubt.");
+                 return;
+             }
+
+             const previousMonthInfo = getPreviousMonthKeyInfo(new Date()); 
+             const shiftsByMonth = JSON.parse(localStorage.getItem(SHIFTS_KEY)) || {};
+             const shiftsToExport = shiftsByMonth[previousMonthInfo.key] || [];
+
+             if (shiftsToExport.length === 0) {
+                 alert(`Es wurden keine Schichten für ${previousMonthInfo.monthName} gefunden. Es gibt nichts abzurechnen.`);
+                 return;
+             }
+             
+             if (!confirm(`Sicher? Das PDF für ${previousMonthInfo.monthName} mit ${shiftsToExport.length} Schichten wird jetzt heruntergeladen. Die Daten bleiben im Protokoll gespeichert (Archiv).`)) {
+                 return;
+             }
+            
+            // PDF jetzt generieren
+            const fahrerNameClean = fahrernameInput.value.replace(/\s/g, '_');
+            const fileName = `Zeiterfassung_${fahrerNameClean}_${previousMonthInfo.key}.pdf`;
+            const pdfBlob = await createMonthSummaryPDF(shiftsToExport, previousMonthInfo);
+
+            // 1. Download starten 
+            initiateDownload(pdfBlob, fileName); 
+            
+            // 2. Monats-Key zur Archivliste hinzufügen (Sperrung)
+            let archivedMonths = JSON.parse(localStorage.getItem(ARCHIVED_MONTHS_KEY)) || [];
+            if (!archivedMonths.includes(previousMonthInfo.key)) {
+                archivedMonths.push(previousMonthInfo.key);
+                localStorage.setItem(ARCHIVED_MONTHS_KEY, JSON.stringify(archivedMonths));
+            }
+            
+            // 3. UI neu rendern (Archiv aktualisieren)
+            initializeStatus();
+
+            // 4. Finaler Alert
+            const userAlertMessage = `
+            ===================================================
+            ✅ MONATSABRECHNUNG ERSTELLT ✅
+            ===================================================
+            
+            Die Abrechnung für ${previousMonthInfo.monthName} wurde erfolgreich erstellt.
+            
+            Das PDF wurde heruntergeladen und heißt:
+            "${fileName}" (Im Downloads-Ordner)
+
+            Hinweis: Die Schichtdaten bleiben im Protokoll gespeichert und können über das Dropdown-Menü erneut als PDF abgerufen werden.
+            `;
+
+            setTimeout(() => {
+                 alert(userAlertMessage);
+            }, 500);
+        }
+        
+        // --- FUNKTION: PDF aus Archiv erneut erstellen ---
+        async function recreatePdfFromArchive() {
+             const monthKey = archiveSelect.value;
+             if (!monthKey) {
+                 alert("Bitte wählen Sie einen Monat aus der Archivliste aus.");
+                 return;
+             }
+             
+             const shiftsByMonth = JSON.parse(localStorage.getItem(SHIFTS_KEY)) || {};
+             const shiftsToExport = shiftsByMonth[monthKey] || [];
+             
+             if (shiftsToExport.length === 0) {
+                 alert("Für diesen Monat sind keine Schichtdaten mehr vorhanden.");
+                 return;
+             }
+             
+             const monthInfo = { key: monthKey, monthName: monthKeyToName(monthKey) };
+             const fahrerNameClean = fahrernameInput.value.replace(/\s/g, '_');
+             const fileName = `ARCHIV_Zeiterfassung_${fahrerNameClean}_${monthKey}.pdf`;
+             
+             const pdfBlob = await createMonthSummaryPDF(shiftsToExport, monthInfo);
+             initiateDownload(pdfBlob, fileName);
+             
+             alert(`Archiv-PDF für ${monthInfo.monthName} wurde erneut erstellt und heruntergeladen.`);
+        }
+        
+        // --- NEUE FUNKTION: ALLE DATEN LÖSCHEN ---
+        function deleteAllData() {
+            if (!confirm("⚠️ WARNUNG: Sind Sie sicher, dass Sie ALLE GESPEICHERTEN SCHICHTDATEN und das ARCHIV unwiderruflich löschen möchten?")) {
+                return;
+            }
+            if (!confirm("⚠️ ZWEITE WARNUNG: Alle lokalen Daten (Schichten, Archiv, Zustand, Kennzeichen) gehen verloren, NUR IHR FAHRERNAME BLEIBT ERHALTEN. Fortfahren?")) {
+                return;
+            }
+
+            // Alle relevanten Keys löschen (außer NAME_KEY)
+            localStorage.removeItem(SHIFTS_KEY);
+            localStorage.removeItem(ARCHIVED_MONTHS_KEY);
+            localStorage.removeItem(STATE_KEY);
+            localStorage.removeItem(KENNZEICHEN_KEY);
+
+            // Zustand zurücksetzen
+            stopTimer(); 
+            state = loadState(); 
+            
+            // Den Namen wieder neu in den localStorage schreiben
+            localStorage.setItem(NAME_KEY, fahrernameInput.value || ''); 
+            
+            initializeStatus(); 
+            renderShiftSummary();
+            
+            alert("✅ Alle Schichtdaten wurden erfolgreich gelöscht. Ihr Name und die Kennzeichenliste blieben erhalten.");
+        }
+
+
+        // --- UNVERÄNDERTE HILFSFUNKTIONEN (Angepasst) ---
+        
+        function populateKennzeichenDropdown() {
+             Array.from(kennzeichenSelect.options).slice(1).forEach(option => option.remove());
+             KENNZEICHEN.forEach(kz => {
+                const option = document.createElement('option');
+                option.value = kz;
+                option.textContent = kz;
+                kennzeichenSelect.appendChild(option);
+            });
+            const storedKennzeichen = localStorage.getItem(KENNZEICHEN_KEY);
+            if (storedKennzeichen) {
+                kennzeichenSelect.value = storedKennzeichen;
+            } else if (KENNZEICHEN.length > 0) {
+                 kennzeichenSelect.value = KENNZEICHEN[0]; 
+                 localStorage.setItem(KENNZEICHEN_KEY, KENNZEICHEN[0]);
+            }
+            kennzeichenSelect.addEventListener('change', () => {
+                 localStorage.setItem(KENNZEICHEN_KEY, kennzeichenSelect.value);
+            });
+        }
+        
+        // Fügt das Dropdown-Menü für das Archiv hinzu
+        function populateArchiveDropdown() {
+             Array.from(archiveSelect.options).slice(1).forEach(option => option.remove()); // Vorherige Optionen löschen
+             
+             // addTestArchiveEntry() ENTFERNT
+             
+             const archivedMonths = JSON.parse(localStorage.getItem(ARCHIVED_MONTHS_KEY)) || [];
+             
+             // Sortiere die Archiv-Einträge absteigend nach Jahr-Monat (YYYY-MM)
+             archivedMonths.sort().reverse(); 
+             
+             let hasOptions = false;
+
+             archivedMonths.forEach(monthKey => {
+                const option = document.createElement('option');
+                option.value = monthKey;
+                option.textContent = monthKeyToName(monthKey);
+                archiveSelect.appendChild(option);
+                hasOptions = true;
+            });
+            
+            // Logik für den "PDF erneut erstellen" Button
+            btnRecreatePdf.disabled = true; 
+
+            archiveSelect.onchange = () => {
+                btnRecreatePdf.disabled = false; 
+            };
+            
+            if (!hasOptions) {
+                 archiveSelect.innerHTML = '<option value="" disabled selected class="text-gray-500">Keine Abrechnungen im Archiv.</option>';
+                 btnRecreatePdf.disabled = true;
+            }
+        }
+        
+        function updateUI() {
+            let totalTimeMs = 0;
+            const now = Date.now();
+            const currentNetTime = state.startTime ? (now - state.startTime) - state.pauseTime : 0;
+
+            if (state.isWorking) {
+                if (state.isPaused) {
+                    const timeBeforePause = state.pauseStart > 0 ? (state.pauseStart - state.startTime) - state.pauseTime : 0;
+                    totalTimeMs = timeBeforePause; 
+                    statusDiv.className = 'status paused';
+                    statusDiv.textContent = 'In Pause...';
+                    btnPause.textContent = 'Pause beenden';
+                    btnStartStop.textContent = 'Stoppen / Speichern'; 
+                    btnStartStop.disabled = false;
+                } else {
+                    totalTimeMs = currentNetTime;
+                    statusDiv.className = 'status working';
+                    statusDiv.textContent = 'Arbeitet...';
+                    btnPause.textContent = 'Pause';
+                    btnStartStop.textContent = 'Stoppen / Speichern'; 
+                    btnStartStop.disabled = false;
+                }
+            } else {
+                totalTimeMs = currentNetTime > 0 ? currentNetTime : 0; 
+                statusDiv.className = 'status stopped';
+                statusDiv.textContent = `Gestoppt. (Seit ${state.startTime ? new Date(state.startTime).toLocaleTimeString("de-DE").substring(0, 5) : 'Start'})`;
+                btnStartStop.textContent = 'Starten';
+                btnPause.textContent = 'Pause'; 
+                btnPause.disabled = true; 
+            }
+            
+            uhrEl.textContent = formatTimeDetailed(totalTimeMs) + ' (Nettozeit heute)';
+            if (state.isWorking && !state.isPaused) {
+                 btnPause.disabled = false;
+            }
+        }
+        
+        
+        function renderShiftSummary() {
+            const summaryDiv = document.getElementById('shift-summary-list');
+            const shiftsByMonth = JSON.parse(localStorage.getItem(SHIFTS_KEY)) || {};
+            
+            const allShifts = [];
+            for (const monthKey in shiftsByMonth) {
+                 shiftsByMonth[monthKey].forEach(shift => {
+                    allShifts.push({...shift, monthKey: monthKey});
+                });
+            }
+
+            const sortedShifts = allShifts.sort((a, b) => b.startTime - a.startTime); 
+
+            let outputHtml = '';
+            let lastMonthKey = null;
+
+            if (state.startTime && (state.isWorking || state.log.length > 0)) {
+                
+                const currentNetTime = state.startTime ? (Date.now() - state.startTime) - state.pauseTime : 0;
+                const netTime = formatTimeDetailed(currentNetTime);
+                const startDateTime = new Date(state.startTime);
+                
+                const startDate = startDateTime.toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit' });
+                const startHour = startDateTime.toLocaleTimeString("de-DE").substring(0, 5);
+                
+                outputHtml += `
+                    <div class="summary-shift current-shift">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-lg text-yellow-400">${startDate} (AKTUELL)</span>
+                            <span class="text-sm text-yellow-400">Start: ${startHour}</span>
+                        </div>
+                        <div class="mt-1 text-sm text-gray-300">
+                             Fahrzeug: <span class="font-medium">${localStorage.getItem(KENNZEICHEN_KEY) || kennzeichenSelect.value || 'N/A'}</span>
+                        </div>
+                        <div class="mt-2 text-base font-bold text-green-400">
+                            Laufende Nettozeit: ${netTime}
+                        </div>
+                        <p class="text-xs text-red-300 mt-1">Diese Schicht wird automatisch gespeichert, wenn Sie auf "Stoppen / Speichern" klicken.</p>
+                    </div>
+                `;
+            }
+
+            if (sortedShifts.length === 0 && !state.startTime) {
+                 summaryDiv.innerHTML = '<p class="text-gray-400 text-center py-4">Noch keine abgeschlossenen Schichten gespeichert.</p>';
+                 return;
+            }
+
+            // Historische Schichten hinzufügen
+            const archivedMonths = JSON.parse(localStorage.getItem(ARCHIVED_MONTHS_KEY)) || [];
+
+            sortedShifts.forEach(shift => {
+                const monthKey = shift.monthKey;
+                
+                if (monthKey !== lastMonthKey) {
+                    const tempDate = new Date(parseInt(monthKey.substring(0, 4)), parseInt(monthKey.substring(5, 7)) - 1, 1);
+                    const monthName = tempDate.toLocaleDateString("de-DE", { month: 'long', year: 'numeric' });
+                    
+                    const archiveBadge = archivedMonths.includes(monthKey) ? '<span class="text-xs font-normal bg-blue-700 text-white px-2 py-0.5 rounded-full ml-2">ARCHIVIERT</span>' : '';
+                    
+                    outputHtml += `<h3 class="text-xl font-semibold text-white mt-4 mb-2 border-b border-gray-600 pb-1">${monthName} ${archiveBadge}</h3>`;
+                    lastMonthKey = monthKey;
+                }
+
+                const netTime = formatTimeDetailed(shift.netTime);
+                const startDateTime = new Date(shift.startTime);
+                const endEntry = shift.log.slice().reverse().find(e => e.action.startsWith('Arbeitsende')); 
+                const endDateTime = endEntry ? new Date(endEntry.time) : null;
+                
+                const startDate = startDateTime.toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit' });
+                const startHour = startDateTime.toLocaleTimeString("de-DE").substring(0, 5);
+                const endHour = endDateTime ? endDateTime.toLocaleTimeString("de-DE").substring(0, 5) : 'Ende unbekannt';
+                
+                outputHtml += `
+                    <div class="summary-shift">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-lg text-white">${startDate}</span>
+                            <span class="text-sm text-yellow-400">${startHour} - ${endHour}</span>
+                        </div>
+                        <div class="mt-1 text-sm text-gray-300">
+                             Schicht (Fahrzeug): <span class="font-medium">${shift.kennzeichen}</span>
+                        </div>
+                        ${shift.bemerkungen ? `<div class="mt-1 text-sm text-red-300">Bemerkung: <span class="font-medium">${shift.bemerkungen}</span></div>` : ''}
+                        <div class="mt-2 text-base font-bold text-green-400">
+                            Netto-Arbeitszeit: ${netTime}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            summaryDiv.innerHTML = outputHtml;
+        }
+
+        function startTimer() { if (timer) clearInterval(timer); timer = setInterval(updateUI, 1000); updateUI(); }
+        function stopTimer() { if (timer) clearInterval(timer); }
+        
+        /**
+         * ZUSAMMENFASSUNG: Startet, stoppt UND speichert die Schicht (Tag beenden).
+         */
+        function startStopTracking() {
+            const now = Date.now();
+            if (kennzeichenSelect.value === '' || fahrernameInput.value.trim() === '') { alert("Bitte Namen und Kennzeichen eingeben."); return; }
+            localStorage.setItem(KENNZEICHEN_KEY, kennzeichenSelect.value); 
+            
+            if (!state.isWorking) {
+                 // STARTEN
+                if (state.log.length === 0 || !state.startTime) { state.startTime = now; state.pauseTime = 0; logAction('Arbeitsbeginn', new Date(now)); } 
+                else { logAction('Arbeitsbeginn (Fortsetzung)', new Date(now)); }
+                state.isWorking = true; state.isPaused = false; startTimer();
+            } else {
+                // STOPPEN UND SPEICHERN (Tag beenden Funktion integriert)
+                if (state.isPaused) { togglePause(); } 
+                
+                if (confirm("Möchten Sie die Zeiterfassung stoppen und die Schicht speichern (Tag beenden)?")) {
+                    
+                    const bemerkungen = prompt("Geben Sie optional eine Bemerkung für diesen Tag ein:");
+                    
+                    if (state.isWorking && state.isPaused && state.pauseStart) { state.pauseTime += now - state.pauseStart; }
+                    
+                    logAction('Arbeitsende (Tag beendet)', new Date(now)); 
+                    const netTime = (now - state.startTime) - state.pauseTime;
+
+                    const newShift = {
+                        fahrer: fahrernameInput.value, 
+                        kennzeichen: localStorage.getItem(KENNZEICHEN_KEY) || kennzeichenSelect.value, 
+                        netTime: netTime, 
+                        startTime: state.startTime, 
+                        log: state.log,
+                        bemerkungen: bemerkungen || '' 
+                    };
+                    
+                    const currentMonthKey = getCurrentMonthKey(); 
+                    let shiftsByMonth = JSON.parse(localStorage.getItem(SHIFTS_KEY)) || {};
+                    
+                    if (!shiftsByMonth[currentMonthKey]) {
+                        shiftsByMonth[currentMonthKey] = [];
+                    }
+                    shiftsByMonth[currentMonthKey].push(newShift);
+
+                    localStorage.setItem(SHIFTS_KEY, JSON.stringify(shiftsByMonth));
+                    
+                    stopTimer();
+                    localStorage.removeItem(STATE_KEY); 
+                    state = loadState(); 
+                    
+                    initializeStatus(); 
+                    
+                    alert(`Tag beendet! Netto-Arbeitszeit: ${formatTimeDetailed(netTime)} wurde gespeichert.`);
+
+                } else {
+                     // Nur gestoppt, aber nicht gespeichert (Zwischenstopp)
+                    state.isWorking = false; stopTimer(); logAction('Arbeitsende (Zwischenstopp)', new Date(now));
+                }
+            }
+            saveState(); 
+            updateUI();
+            renderShiftSummary(); 
+        }
+        
+        function togglePause() {
+            const now = Date.now();
+            if (!state.isWorking && !state.isPaused) { alert("Bitte zuerst die Arbeit starten oder fortsetzen."); return; }
+            if (!state.isPaused) {
+                state.isPaused = true; state.pauseStart = now; stopTimer(); logAction('Pause Start', new Date(now));
+            } else {
+                if (state.pauseStart) { state.pauseTime += now - state.pauseStart; state.pauseStart = null; }
+                state.isPaused = false; startTimer(); logAction('Pause Ende', new Date(now));
+            }
+            saveState(); 
+            updateUI();
+            renderShiftSummary(); 
+        }
+        
+        
+        function initializeStatus() {
+             populateKennzeichenDropdown();
+             
+             // Laden des Namens (sollte immer zuerst passieren)
+             fahrernameInput.value = localStorage.getItem(NAME_KEY) || '';
+             
+             fahrernameInput.addEventListener('input', () => {
+                 localStorage.setItem(NAME_KEY, fahrernameInput.value);
+                 renderShiftSummary();
+                 if (fahrernameInput.value.trim() !== '') {
+                    populateArchiveDropdown();
+                 }
+             });
+             
+             // Generierung von Testschichten (ENTFERNT)
+             
+             // Archiv Dropdown aktualisieren
+             populateArchiveDropdown();
+             
+             renderShiftSummary();
+             
+             const isSummaryAllowed = isPreviousMonthCompleted();
+             const previousMonthInfo = getPreviousMonthKeyInfo(new Date()); 
+             
+             btnMonthSummary.disabled = !isSummaryAllowed; 
+             
+             const today = getCurrentDate(); 
+             const currentMonth = today.toLocaleDateString('de-DE', { month: 'long' });
+             
+             // btnToggleTestDate.textContent ENTFERNT
+             
+             if (isSummaryAllowed) {
+                btnMonthSummary.textContent = `Monatsabrechnung ${previousMonthInfo.monthName} erstellen (PDF)`;
+                summaryInfo.textContent = `Abrechnung für ${previousMonthInfo.monthName} ist erlaubt. (Heute: ${today.getDate()}. ${currentMonth})`;
+                summaryInfo.className = 'text-sm text-green-400 text-center mt-2 font-semibold';
+             } else {
+                btnMonthSummary.textContent = `Monatsabrechnung ${previousMonthInfo.monthName} erstellen (PDF)`;
+                btnMonthSummary.disabled = true;
+                summaryInfo.textContent = `Abrechnung erst ab dem 1. des Monats möglich. (Heute: ${today.getDate()}. ${currentMonth})`;
+                summaryInfo.className = 'text-sm text-red-400 text-center mt-2 font-semibold';
+             }
+             
+             if (state.isWorking && !state.isPaused) {
+                 startTimer();
+             } else {
+                 updateUI();
+             }
+        }
+        
+        // Beim Laden des Skripts
+        document.addEventListener('DOMContentLoaded', initializeStatus);
+    </script>
+</body>
+</html>
