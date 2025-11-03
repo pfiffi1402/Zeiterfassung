@@ -151,7 +151,6 @@
         const SHIFTS_KEY = 'zeitlog_shifts';     
         const STATE_KEY = 'timer_state';         
         const KENNZEICHEN_KEY = 'current_kennzeichen'; 
-        // const TEST_DATE_KEY = 'test_date_active'; // ENTFERNT
         const ARCHIVED_MONTHS_KEY = 'archived_months'; 
         
         // KENNZEICHENLISTE
@@ -168,15 +167,12 @@
         const btnPause = document.getElementById('btnPause');
         const btnMonthSummary = document.getElementById('btnMonthSummary'); 
         const summaryInfo = document.getElementById('summary-info');
-        // const btnToggleTestDate = document.getElementById('btnToggleTestDate'); // ENTFERNT
         const archiveSelect = document.getElementById('archive-select');
         const btnRecreatePdf = document.getElementById('btnRecreatePdf');
-        // const btnShareApp = document.getElementById('btnShareApp'); // ENTFERNT
 
         // --- Globaler Zustand ---
         let state = loadState();
         let timer = null;
-        // let isTestDateActive = localStorage.getItem(TEST_DATE_KEY) === 'true'; // ENTFERNT
 
         function loadState() {
             const defaultState = { isWorking: false, isPaused: false, startTime: null, pauseTime: 0, pauseStart: null, log: [] };
@@ -220,8 +216,6 @@
                 date: prevDate 
             };
         }
-
-        // function toggleTestDate() { ... } // ENTFERNT
 
         // --- HILFSFUNKTIONEN ---
 
@@ -269,13 +263,14 @@
              const date = new Date(parseInt(year), parseInt(month) - 1, 1);
              return date.toLocaleDateString("de-DE", { month: 'long', year: 'numeric' });
         }
-        
-        // --- SIMULATION: Testdaten generieren (ENTFERNT) ---
-        // function generateTestShiftsForPreviousMonth() { ... } 
-        
-        // --- Archiv Test-Eintrag (ENTFERNT) ---
-        // function addTestArchiveEntry() { ... } 
 
+        // --- NEUE FUNKTION: Dropdown zurücksetzen ---
+        function resetKennzeichenDropdownSelection() {
+            kennzeichenSelect.value = ''; // Setzt den Wert auf den leeren String (value="" der Option "Kennzeichen auswählen...")
+            localStorage.removeItem(KENNZEICHEN_KEY); // Entfernt das gespeicherte Kennzeichen
+            console.log("Kennzeichen-Dropdown wurde zurückgesetzt.");
+        }
+        
 
         // --- PDF-FUNKTIONEN ---
         
@@ -406,9 +401,6 @@
             URL.revokeObjectURL(url);
         }
 
-        // --- TEILEN-FUNKTION (ENTFERNT) ---
-        // function shareAppFile() { ... }
-
         // --- HAUPTFUNKTION: Monatsabrechnung erstellen ---
 
         async function createMonthSummary() {
@@ -496,7 +488,7 @@
              alert(`Archiv-PDF für ${monthInfo.monthName} wurde erneut erstellt und heruntergeladen.`);
         }
         
-        // --- NEUE FUNKTION: ALLE DATEN LÖSCHEN ---
+        // --- HAUPTFUNKTION: ALLE DATEN LÖSCHEN ---
         function deleteAllData() {
             if (!confirm("⚠️ WARNUNG: Sind Sie sicher, dass Sie ALLE GESPEICHERTEN SCHICHTDATEN und das ARCHIV unwiderruflich löschen möchten?")) {
                 return;
@@ -509,14 +501,17 @@
             localStorage.removeItem(SHIFTS_KEY);
             localStorage.removeItem(ARCHIVED_MONTHS_KEY);
             localStorage.removeItem(STATE_KEY);
-            localStorage.removeItem(KENNZEICHEN_KEY);
+            localStorage.removeItem(KENNZEICHEN_KEY); // <-- Wichtig: Gespeichertes Kennzeichen löschen
 
             // Zustand zurücksetzen
             stopTimer(); 
             state = loadState(); 
             
-            // Den Namen wieder neu in den localStorage schreiben
+            // Den Namen wieder neu in den localStorage schreiben (falls geändert)
             localStorage.setItem(NAME_KEY, fahrernameInput.value || ''); 
+            
+            // 🔑 ANFORDERUNG 1: Kennzeichen-Dropdown zurücksetzen
+            resetKennzeichenDropdownSelection(); 
             
             initializeStatus(); 
             renderShiftSummary();
@@ -528,20 +523,28 @@
         // --- UNVERÄNDERTE HILFSFUNKTIONEN (Angepasst) ---
         
         function populateKennzeichenDropdown() {
+             // Optionen außer dem Platzhalter entfernen
              Array.from(kennzeichenSelect.options).slice(1).forEach(option => option.remove());
+             
+             // Kennzeichen hinzufügen
              KENNZEICHEN.forEach(kz => {
                 const option = document.createElement('option');
                 option.value = kz;
                 option.textContent = kz;
                 kennzeichenSelect.appendChild(option);
             });
+            
             const storedKennzeichen = localStorage.getItem(KENNZEICHEN_KEY);
+            
             if (storedKennzeichen) {
+                // Wenn ein Kennzeichen gespeichert ist, dieses auswählen
                 kennzeichenSelect.value = storedKennzeichen;
-            } else if (KENNZEICHEN.length > 0) {
-                 kennzeichenSelect.value = KENNZEICHEN[0]; 
-                 localStorage.setItem(KENNZEICHEN_KEY, KENNZEICHEN[0]);
+            } else {
+                 // Wenn nichts gespeichert ist, den Platzhalter auswählen (value="")
+                 kennzeichenSelect.value = '';
             }
+            
+            // Event Listener, um die Auswahl zu speichern
             kennzeichenSelect.addEventListener('change', () => {
                  localStorage.setItem(KENNZEICHEN_KEY, kennzeichenSelect.value);
             });
@@ -550,8 +553,6 @@
         // Fügt das Dropdown-Menü für das Archiv hinzu
         function populateArchiveDropdown() {
              Array.from(archiveSelect.options).slice(1).forEach(option => option.remove()); // Vorherige Optionen löschen
-             
-             // addTestArchiveEntry() ENTFERNT
              
              const archivedMonths = JSON.parse(localStorage.getItem(ARCHIVED_MONTHS_KEY)) || [];
              
@@ -719,7 +720,10 @@
          */
         function startStopTracking() {
             const now = Date.now();
-            if (kennzeichenSelect.value === '' || fahrernameInput.value.trim() === '') { alert("Bitte Namen und Kennzeichen eingeben."); return; }
+            if (kennzeichenSelect.value === '' || fahrernameInput.value.trim() === '') { 
+                 alert("Bitte Namen und Kennzeichen eingeben."); 
+                 return; 
+            }
             localStorage.setItem(KENNZEICHEN_KEY, kennzeichenSelect.value); 
             
             if (!state.isWorking) {
@@ -762,6 +766,9 @@
                     stopTimer();
                     localStorage.removeItem(STATE_KEY); 
                     state = loadState(); 
+                    
+                    // 🔑 ANFORDERUNG 2: Kennzeichen-Dropdown zurücksetzen
+                    resetKennzeichenDropdownSelection(); 
                     
                     initializeStatus(); 
                     
@@ -806,8 +813,6 @@
                  }
              });
              
-             // Generierung von Testschichten (ENTFERNT)
-             
              // Archiv Dropdown aktualisieren
              populateArchiveDropdown();
              
@@ -820,8 +825,6 @@
              
              const today = getCurrentDate(); 
              const currentMonth = today.toLocaleDateString('de-DE', { month: 'long' });
-             
-             // btnToggleTestDate.textContent ENTFERNT
              
              if (isSummaryAllowed) {
                 btnMonthSummary.textContent = `Monatsabrechnung ${previousMonthInfo.monthName} erstellen (PDF)`;
