@@ -61,6 +61,32 @@
              justify-content: flex-end; 
              margin-bottom: 20px;
         }
+        .checkbox-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            flex-grow: 1;
+        }
+        .vacation-control {
+            border: 1px solid #3b82f6; 
+            background-color: #1f2937;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            transition: all 0.3s ease-in-out;
+            display: none; 
+            opacity: 0;
+        }
+        .vacation-control.active {
+            display: block;
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col items-center p-4 sm:p-6">
@@ -86,8 +112,39 @@
                         class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition appearance-none">
                     <option value="" disabled selected class="text-gray-500">Kennzeichen auswählen...</option>
                 </select>
-            </div>
+                
+                <div class="checkbox-row">
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="feiertag-checkbox" class="w-4 h-4 text-yellow-400 bg-gray-700 border-gray-600 rounded focus:ring-yellow-500">
+                        <label for="feiertag-checkbox" class="ml-2 text-sm font-medium text-yellow-400 whitespace-nowrap">FEIERTAG</label>
+                    </div>
+                    
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="vacation-toggle-checkbox" class="w-4 h-4 text-blue-400 bg-gray-700 border-gray-600 rounded focus:ring-blue-500">
+                        <label for="vacation-toggle-checkbox" class="ml-2 text-sm font-medium text-blue-400 whitespace-nowrap">URLAUB</label>
+                    </div>
+                </div>
+                </div>
             
+            <div id="vacation-control" class="vacation-control">
+                <h3 class="text-lg font-semibold text-blue-400 mb-3">🗓️ Urlaubszeitraum wählen</h3>
+                <div class="flex gap-2 mb-2">
+                    <div class="w-1/2">
+                        <label for="vacation-date-start" class="block text-xs font-medium text-gray-400">Von (Datum)</label>
+                        <input type="date" id="vacation-date-start" class="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-white focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <div class="w-1/2">
+                        <label for="vacation-date-end" class="block text-xs font-medium text-gray-400">Bis (Datum)</label>
+                        <input type="date" id="vacation-date-end" class="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-white focus:ring-2 focus:ring-blue-400">
+                    </div>
+                </div>
+                 <div class="flex gap-2">
+                    <button onclick="saveVacationDays()" class="action-btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-sm">
+                        Urlaub speichern (Werktage abzügl. Feiertage berechnen)
+                    </button>
+                </div>
+                <p id="vacation-info" class="text-xs text-gray-400 mt-2">Aktuell: Keine Urlaubstage definiert.</p>
+            </div>
             <div id="status" class="status stopped">Gestoppt</div>
             
             <div id="uhr" class="zeit">00:00:00 (Nettozeit heute)</div>
@@ -95,7 +152,7 @@
             <div class="flex justify-between gap-4 pt-2">
                 <button id="btnStartStop" onclick="startStopTracking()" 
                         class="action-btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg text-lg">
-                    Starten / Stoppen
+                    Starten / Speichern
                 </button>
                 <button id="btnPause" onclick="togglePause()" 
                         class="action-btn w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 rounded-lg text-lg" disabled>
@@ -111,6 +168,40 @@
             <p id="summary-info" class="text-sm text-gray-400 text-center mt-2"></p>
             
             
+            <button id="btnToggleManual" onclick="toggleManualShiftInput()" 
+                    class="action-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg mt-4 text-lg flex items-center justify-center space-x-2">
+                <span id="manual-toggle-icon">➕</span>
+                <span>Manuelle Schichteingabe (Nachtrag) anzeigen</span>
+            </button>
+
+            <div id="manual-shift-container" style="display: none;" class="pt-4 border-t border-gray-700 mt-6 space-y-4">
+                <h3 class="text-lg font-semibold text-orange-400">📅 Manuelle Schichteingabe</h3>
+                
+                <div>
+                    <label for="manual-date" class="block text-sm font-medium text-gray-300 mb-1">Datum der Schicht</label>
+                    <input type="date" id="manual-date" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-orange-400">
+                </div>
+
+                <div class="flex gap-4">
+                    <div class="w-1/3">
+                        <label for="manual-start" class="block text-sm font-medium text-gray-300 mb-1">Start (hh:mm)</label>
+                        <input type="time" id="manual-start" value="08:00" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-orange-400">
+                    </div>
+                    <div class="w-1/3">
+                        <label for="manual-end" class="block text-sm font-medium text-gray-300 mb-1">Ende (hh:mm)</label>
+                        <input type="time" id="manual-end" value="17:00" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-orange-400">
+                    </div>
+                    <div class="w-1/3">
+                        <label for="manual-pause" class="block text-sm font-medium text-gray-300 mb-1">Pause (Min.)</label>
+                        <input type="number" id="manual-pause" value="60" min="0" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-orange-400">
+                    </div>
+                </div>
+                
+                <button onclick="submitManualShift()" 
+                        class="action-btn w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg text-lg">
+                    Schicht nachtragen & speichern
+                </button>
+            </div>
             <div class="pt-4 border-t border-gray-700 mt-4 space-y-3" id="archive-section">
                 <h3 class="text-lg font-semibold text-yellow-400">Historische Monatsdaten (Archiv)</h3>
                  <div>
@@ -133,7 +224,7 @@
             </div>
         </div>
 
-        <div class="pt-6 mt-2">
+        <div class="pt-6 mt-2 space-y-3">
             <button id="btnDeleteAllData" onclick="deleteAllData()" 
                     class="action-btn w-full bg-red-900 hover:bg-red-700 text-white font-black py-3 rounded-lg text-sm uppercase flex items-center justify-center space-x-2">
                 <span class="text-xl">⚠️</span><span>ALLE SCHICHTDATEN LÖSCHEN</span><span class="text-xl">⚠️</span>
@@ -146,21 +237,32 @@
     <script>
         const { jsPDF } = window.jspdf;
 
+        // ===============================================
+        // ⚙️ TESTMODUS DEAKTIVIERT 
+        // ===============================================
+        const TEST_MODE = false; 
+        // ===============================================
+        
+        
         // --- LocalStorage Keys ---
         const NAME_KEY = 'fahrername';           
         const SHIFTS_KEY = 'zeitlog_shifts';     
         const STATE_KEY = 'timer_state';         
         const KENNZEICHEN_KEY = 'current_kennzeichen'; 
         const ARCHIVED_MONTHS_KEY = 'archived_months'; 
+        const FEIERTAGE_KEY = 'feiertag_checked'; 
+        const VACATION_KEY = 'vacation_days'; 
+        const VACATION_TOGGLE_KEY = 'vacation_toggle_checked'; 
         
         // KENNZEICHENLISTE
         const KENNZEICHEN = ["WR-TP 11", "WR-TP 60", "WR-TP 75", "WR-TP 100", "WR-TP 103", "WR-TP 104", "WR-TP 105", "WR-TP 106", "WR-TP 111", "WR-TP 112", "WR-TP 119", "WR-TP 316", "WR-TP 444", "WR-TP 557", "WR-TP 667"];
         
-
-
         // --- DOM-Elemente ---
         const fahrernameInput = document.getElementById('fahrername');
         const kennzeichenSelect = document.getElementById('kennzeichen');
+        const feiertagCheckbox = document.getElementById('feiertag-checkbox');
+        const vacationToggleCheckbox = document.getElementById('vacation-toggle-checkbox'); 
+        const vacationControlDiv = document.getElementById('vacation-control');           
         const uhrEl = document.getElementById('uhr');
         const statusDiv = document.getElementById('status');
         const btnStartStop = document.getElementById('btnStartStop');
@@ -169,6 +271,18 @@
         const summaryInfo = document.getElementById('summary-info');
         const archiveSelect = document.getElementById('archive-select');
         const btnRecreatePdf = document.getElementById('btnRecreatePdf');
+        
+        // NEUE DOM-Elemente für Urlaub (Datum)
+        const vacationDateStart = document.getElementById('vacation-date-start');
+        const vacationDateEnd = document.getElementById('vacation-date-end');
+        const vacationInfoEl = document.getElementById('vacation-info');
+        
+        // NEUE DOM-Elemente für manuelle Eingabe
+        const manualDateInput = document.getElementById('manual-date');
+        const manualStartInput = document.getElementById('manual-start');
+        const manualEndInput = document.getElementById('manual-end');
+        const manualPauseInput = document.getElementById('manual-pause');
+
 
         // --- Globaler Zustand ---
         let state = loadState();
@@ -193,17 +307,11 @@
         
         // --- HILFSFUNKTIONEN FÜR DATUM & MONAT ---
 
-        /**
-         * Gibt das aktuelle (reale) Datum zurück.
-         */
         function getCurrentDate() {
             return new Date();
         }
         
-        /**
-         * Gibt den Key und den Namen des Vormonats, basierend auf dem REALEN Datum, zurück.
-         */
-        function getPreviousMonthKeyInfo(baseDate = new Date()) {
+        function getPreviousMonthKeyInfo(baseDate = getCurrentDate()) {
             const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
             const year = prevDate.getFullYear();
             const month = String(prevDate.getMonth() + 1).padStart(2, '0');
@@ -213,12 +321,20 @@
             return { 
                 key: `${year}-${month}`, 
                 monthName: monthName,
-                date: prevDate 
+                date: prevDate, 
+                year: year,
+                monthIndex: prevDate.getMonth() 
             };
         }
 
-        // --- HILFSFUNKTIONEN ---
-
+        function monthKeyToName(monthKey) {
+             const [year, month] = monthKey.split('-');
+             const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+             return date.toLocaleDateString("de-DE", { month: 'long', year: 'numeric' });
+        }
+        
+        // --- Allgemeine Hilfsfunktionen ---
+        
         function formatTime(ms) {
             const totalSeconds = Math.floor(ms / 1000);
             const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
@@ -233,86 +349,517 @@
              const s = String(totalSeconds % 60).padStart(2, '0');
              return `${h}:${m}:${s}`;
         }
-
+        
         function logAction(action, time) {
             const logEntry = { action: action, time: time.valueOf(), timestamp: time.toLocaleString("de-DE") };
             state.log.push(logEntry);
             saveState();
         }
 
-        /**
-         * Prüft, ob Monatsabrechnung erlaubt ist (1. des Monats erreicht).
-         */
         function isPreviousMonthCompleted() {
             const today = getCurrentDate(); 
             return today.getDate() === 1; 
         }
 
         function getCurrentMonthKey() {
-            const today = new Date(); 
+            const today = getCurrentDate(); 
             const year = today.getFullYear();
             const month = String(today.getMonth() + 1).padStart(2, '0');
             return `${year}-${month}`;
         }
         
-        /**
-         * Konvertiert Monats-Key (YYYY-MM) in Monatsnamen (März 2024).
-         */
-        function monthKeyToName(monthKey) {
-             const [year, month] = monthKey.split('-');
-             const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-             return date.toLocaleDateString("de-DE", { month: 'long', year: 'numeric' });
+        // --- Feiertags-Logik (Sachsen-Anhalt) ---
+
+        function getEasterSunday(year) {
+            const a = year % 19;
+            const b = Math.floor(year / 100);
+            const c = year % 100;
+            const d = Math.floor(b / 4);
+            const e = b % 4;
+            const g = Math.floor((8 * b + 13) / 25);
+            const h = (19 * a + b - d - g + 15) % 30;
+            const i = Math.floor(c / 4);
+            const k = c % 4;
+            const l = (32 + 2 * e + 2 * i - h - k) % 7;
+            const m = Math.floor((a + 11 * h + 22 * l) / 451);
+            const month = Math.floor((h + l - 7 * m + 114) / 31);
+            const day = ((h + l - 7 * m + 114) % 31) + 1;
+            
+            const easterDate = new Date(year, month - 1, day);
+            easterDate.setHours(0, 0, 0, 0); 
+            return easterDate;
         }
 
-        // --- NEUE FUNKTION: Dropdown zurücksetzen ---
-        function resetKennzeichenDropdownSelection() {
-            kennzeichenSelect.value = ''; // Setzt den Wert auf den leeren String (value="" der Option "Kennzeichen auswählen...")
-            localStorage.removeItem(KENNZEICHEN_KEY); // Entfernt das gespeicherte Kennzeichen
-            console.log("Kennzeichen-Dropdown wurde zurückgesetzt.");
+        function isPublicHolidaySA(date) {
+            const d = date.getDate();
+            const m = date.getMonth() + 1; 
+            const y = date.getFullYear();
+
+            const fixedHolidays = [
+                [1, 1],   // Neujahr
+                [6, 1],   // Heilige Drei Könige
+                [1, 5],   // Tag der Arbeit
+                [3, 10],  // Tag der Deutschen Einheit
+                [31, 10], // Reformationstag
+                [25, 12], // 1. Weihnachtstag
+                [26, 12]  // 2. Weihnachtstag
+            ];
+
+            for (const [day, month] of fixedHolidays) {
+                if (d === day && m === month) return true;
+            }
+
+            const easterSunday = getEasterSunday(y);
+            const esMs = easterSunday.valueOf();
+            
+            const dateOnlyMs = new Date(y, m - 1, d).setHours(0, 0, 0, 0);
+
+            const movableHolidaysMs = [
+                esMs - (2 * 24 * 60 * 60 * 1000),      // Karfreitag (-2 Tage)
+                esMs + (1 * 24 * 60 * 60 * 1000),       // Ostermontag (+1 Tag)
+                esMs + (39 * 24 * 60 * 60 * 1000),      // Christi Himmelfahrt (+39 Tage)
+                esMs + (50 * 24 * 60 * 60 * 1000)       // Pfingstmontag (+50 Tage)
+            ];
+
+            for (const holidayMs of movableHolidaysMs) {
+                if (dateOnlyMs === holidayMs) return true;
+            }
+
+            return false;
+        }
+
+        // --- CHECKBOX UND UI LOGIK ---
+        
+        function initFeiertagCheckbox() {
+            const storedFeiertag = localStorage.getItem(FEIERTAGE_KEY);
+            if (storedFeiertag !== null) {
+                feiertagCheckbox.checked = (storedFeiertag === 'true');
+            }
+            feiertagCheckbox.addEventListener('change', () => {
+                localStorage.setItem(FEIERTAGE_KEY, feiertagCheckbox.checked);
+            });
         }
         
+        /**
+         * Initialisiert die Urlaubs-Toggle-Checkbox und steuert die Anzeige des Blocks.
+         */
+        function initVacationToggle() {
+            // Lade den gespeicherten Zustand des Toggles
+            const storedVacationToggle = localStorage.getItem(VACATION_TOGGLE_KEY);
+            if (storedVacationToggle !== null) {
+                vacationToggleCheckbox.checked = (storedVacationToggle === 'true');
+            }
+            
+            // Initialen Zustand des Blocks setzen
+            toggleVacationBlock(vacationToggleCheckbox.checked);
 
+            // Event Listener für Zustandsänderung
+            vacationToggleCheckbox.addEventListener('change', () => {
+                const isChecked = vacationToggleCheckbox.checked;
+                localStorage.setItem(VACATION_TOGGLE_KEY, isChecked);
+                toggleVacationBlock(isChecked);
+                
+                if (!isChecked) {
+                    // Wenn der Block ausgeblendet wird, die gespeicherten Urlaubstage löschen
+                    if (confirm("Möchten Sie die aktuell geplanten Urlaubstage löschen, da Sie die Eingabe deaktivieren?")) {
+                        localStorage.removeItem(VACATION_KEY);
+                        vacationDateStart.value = '';
+                        vacationDateEnd.value = '';
+                        renderVacationInfo();
+                    }
+                }
+            });
+        }
+
+        /**
+         * Steuert die Sichtbarkeit des Urlaubs-Eingabeblocks.
+         * @param {boolean} show - True, um den Block anzuzeigen, False, um ihn auszublenden.
+         */
+        function toggleVacationBlock(show) {
+            if (show) {
+                vacationControlDiv.classList.add('active');
+            } else {
+                vacationControlDiv.classList.remove('active');
+            }
+        }
+
+        function resetKennzeichenDropdownSelection() {
+            kennzeichenSelect.value = ''; 
+            localStorage.removeItem(KENNZEICHEN_KEY); 
+        }
+        
+        // --- URLAUBSFUNKTIONEN ---
+        
+        /**
+         * Zählt die Werktage (Mo-Fr) zwischen zwei Datumsangaben (inklusive),
+         * die KEIN gesetzlicher Feiertag in Sachsen-Anhalt sind.
+         */
+        function countWorkingDays(startDate, endDate) {
+            let count = 0;
+            const currentDate = new Date(startDate);
+            
+            currentDate.setHours(0, 0, 0, 0); 
+            endDate.setHours(0, 0, 0, 0); 
+
+            while (currentDate.getTime() <= endDate.getTime()) {
+                const dayOfWeek = currentDate.getDay(); // 0 = So, 6 = Sa
+                
+                // Prüfe, ob es ein Wochentag (Mo-Fr) ist
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    
+                    // Prüfe, ob der Werktag KEIN Feiertag in Sachsen-Anhalt ist
+                    if (!isPublicHolidaySA(currentDate)) {
+                       count++;
+                    }
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            return count;
+        }
+
+        function saveVacationDays() {
+            const startDateStr = vacationDateStart.value;
+            const endDateStr = vacationDateEnd.value;
+
+            if (!startDateStr || !endDateStr) {
+                alert("Bitte wählen Sie ein Start- und Enddatum für den Urlaub aus.");
+                return;
+            }
+            
+            // String-Daten auf 0 Uhr setzen
+            const [y1, m1, d1] = startDateStr.split('-').map(Number);
+            const startDate = new Date(y1, m1 - 1, d1);
+            
+            const [y2, m2, d2] = endDateStr.split('-').map(Number);
+            const endDate = new Date(y2, m2 - 1, d2);
+            
+            if (startDate.getTime() > endDate.getTime()) {
+                alert("Das Startdatum darf nicht nach dem Enddatum liegen.");
+                return;
+            }
+            
+            const days = countWorkingDays(startDate, endDate);
+
+            if (days === 0) {
+                 alert("Im gewählten Zeitraum sind keine gültigen Urlaubstage (Werktage abzüglich Feiertage/Wochenenden) enthalten.");
+                 // Lösche alte Daten, falls vorhanden
+                 localStorage.removeItem(VACATION_KEY); 
+                 renderVacationInfo();
+                 return;
+            }
+            
+            const vacationData = { 
+                startDate: startDateStr, 
+                endDate: endDateStr, 
+                totalWorkingDays: days 
+            };
+            localStorage.setItem(VACATION_KEY, JSON.stringify(vacationData));
+            
+            alert(`Urlaubszeitraum von ${startDateStr} bis ${endDateStr} gespeichert. Automatisch berechnete Werktage (ohne Feiertage): ${days}.`);
+            renderVacationInfo();
+        }
+        
+        function loadVacationData() {
+            try {
+                const data = JSON.parse(localStorage.getItem(VACATION_KEY));
+                if (data && data.startDate) {
+                    const [y1, m1, d1] = data.startDate.split('-').map(Number);
+                    data.startDateObj = new Date(y1, m1 - 1, d1);
+                    data.startDateObj.setHours(0, 0, 0, 0); 
+                }
+                if (data && data.endDate) {
+                    const [y2, m2, d2] = data.endDate.split('-').map(Number);
+                    data.endDateObj = new Date(y2, m2 - 1, d2);
+                    data.endDateObj.setHours(0, 0, 0, 0); 
+                }
+                return data;
+            } catch (e) {
+                return null;
+            }
+        }
+        
+        function renderVacationInfo() {
+            const data = loadVacationData();
+            if (data) {
+                vacationInfoEl.textContent = `Aktuell: ${data.totalWorkingDays} Werktage Urlaub geplant (Von ${data.startDate} bis ${data.endDate}).`;
+                vacationInfoEl.className = 'text-xs text-green-400 mt-2 font-semibold';
+                
+                // Setze die Kalender-Inputs, falls Daten geladen werden
+                vacationDateStart.value = data.startDate;
+                vacationDateEnd.value = data.endDate;
+                
+            } else {
+                vacationInfoEl.textContent = 'Aktuell: Keine Urlaubstage definiert.';
+                vacationInfoEl.className = 'text-xs text-gray-400 mt-2';
+            }
+        }
+        
+        // --- FUNKTION ZUR MANUELLEN NACHERFASSUNG ---
+
+        /**
+         * Schaltet die Sichtbarkeit des Blocks für die manuelle Schichteingabe um.
+         */
+        function toggleManualShiftInput() {
+            const container = document.getElementById('manual-shift-container');
+            const icon = document.getElementById('manual-toggle-icon');
+            const btn = document.getElementById('btnToggleManual');
+            
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                icon.textContent = '➖';
+                btn.querySelector('span:last-child').textContent = 'Manuelle Schichteingabe (Nachtrag) ausblenden';
+            } else {
+                container.style.display = 'none';
+                icon.textContent = '➕';
+                btn.querySelector('span:last-child').textContent = 'Manuelle Schichteingabe (Nachtrag) anzeigen';
+            }
+        }
+
+        function submitManualShift() {
+            const dateStr = manualDateInput.value;
+            const startTimeStr = manualStartInput.value;
+            const endTimeStr = manualEndInput.value;
+            const pauseMinutes = parseInt(manualPauseInput.value, 10);
+            
+            if (!dateStr || !startTimeStr || !endTimeStr || isNaN(pauseMinutes)) {
+                alert("Bitte füllen Sie alle Felder aus (Datum, Start, Ende, Pause).");
+                return;
+            }
+
+            const [startHour, startMinute] = startTimeStr.split(':').map(Number);
+            const [endHour, endMinute] = endTimeStr.split(':').map(Number);
+            
+            // Datum und Uhrzeit zusammenführen
+            const dateParts = dateStr.split('-');
+            const year = Number(dateParts[0]);
+            const month = Number(dateParts[1]) - 1; // JS Monate sind 0-basiert
+            const day = Number(dateParts[2]);
+
+            const startDateTime = new Date(year, month, day, startHour, startMinute, 0);
+            let endDateTime = new Date(year, month, day, endHour, endMinute, 0);
+            
+            const startTime = startDateTime.valueOf();
+            let endTime = endDateTime.valueOf();
+            
+            // Überprüfen, ob die Endzeit am nächsten Tag liegt
+            if (endTime <= startTime) {
+                 if (!confirm("Die Endzeit liegt vor oder gleich der Startzeit. Soll die Endzeit automatisch auf den nächsten Tag gesetzt werden (z.B. Nachtschicht)?")) {
+                      return;
+                 }
+                 endDateTime.setDate(endDateTime.getDate() + 1); // Setze das Datum der Endzeit auf den nächsten Tag
+                 endTime = endDateTime.valueOf();
+            }
+            
+            const bruttoTimeMs = endTime - startTime;
+            const pauseTimeMs = pauseMinutes * 60 * 1000;
+            const netTimeMs = bruttoTimeMs - pauseTimeMs;
+            
+            if (netTimeMs < 0) {
+                 alert("Fehler: Die Pausenzeit ist länger als die Brutto-Arbeitszeit. Bitte korrigieren Sie die Eingaben.");
+                 return;
+            }
+            
+            const selectedKZ = kennzeichenSelect.value;
+            if (selectedKZ === '') {
+                 alert("Bitte wählen Sie das Kennzeichen für die nachgetragene Schicht aus.");
+                 return;
+            }
+            
+            if (!fahrernameInput.value.trim()) {
+                 alert("Bitte geben Sie Ihren Namen ein.");
+                 return;
+            }
+            
+            // Schicht-Objekt erstellen
+            const newShift = {
+                fahrer: fahrernameInput.value, 
+                kennzeichen: selectedKZ, 
+                netTime: netTimeMs, 
+                startTime: startTime, 
+                log: [
+                    { action: "Arbeitsbeginn (Manuell)", time: startTime, timestamp: startDateTime.toLocaleString("de-DE") },
+                    { action: `Pause (Manuell) ${pauseMinutes} Min.`, time: startTime + (bruttoTimeMs / 2), timestamp: new Date(startTime + (bruttoTimeMs / 2)).toLocaleString("de-DE") }, 
+                    { action: "Arbeitsende (Manuell)", time: endTime, timestamp: endDateTime.toLocaleString("de-DE") }
+                ],
+                bemerkungen: `Nachtrag: Brutto ${formatTime(bruttoTimeMs)}, Pause ${pauseMinutes} Min. (${formatTime(pauseTimeMs)})`
+            };
+
+            // Im LocalStorage speichern
+            const yearKey = startDateTime.getFullYear();
+            const monthKey = String(startDateTime.getMonth() + 1).padStart(2, '0');
+            const currentMonthKey = `${yearKey}-${monthKey}`;
+            
+            let shiftsByMonth = JSON.parse(localStorage.getItem(SHIFTS_KEY)) || {};
+            if (!shiftsByMonth[currentMonthKey]) {
+                shiftsByMonth[currentMonthKey] = [];
+            }
+            
+            // Füge die neue Schicht hinzu
+            shiftsByMonth[currentMonthKey].push(newShift);
+            
+            localStorage.setItem(SHIFTS_KEY, JSON.stringify(shiftsByMonth));
+            
+            alert(`Schicht vom ${dateStr} wurde erfolgreich nachgetragen. Nettozeit: ${formatTime(netTimeMs)}.`);
+            
+            // UI aktualisieren
+            renderShiftSummary();
+        }
+        
         // --- PDF-FUNKTIONEN ---
         
         async function createMonthSummaryPDF(shiftsToExport, monthInfo) {
-            const doc = new jsPDF();
+            const doc = new jsPDF('l', 'mm', 'a4'); // 'l' für Landscape (Querformat)
             const fahrerName = fahrernameInput.value || "Unbekannt";
             let totalNetTimeMs = 0;
             let totalBruttoTimeMs = 0;
             let totalPauseTimeMs = 0;
+            let totalDocumentedVacationDays = 0; 
             
-            shiftsToExport.sort((a, b) => a.startTime - b.startTime);
+            const vacationData = loadVacationData();
+            const getDayOfWeek = (date) => date.toLocaleDateString('de-DE', { weekday: 'short' });
+            
+            const getShiftsForDay = (dayOfMonth, shifts) => {
+                // Filtere Schichten, die an diesem Tag starten
+                return shifts.filter(shift => {
+                    const shiftDate = new Date(shift.startTime);
+                    return shiftDate.getDate() === dayOfMonth && shiftDate.getMonth() === monthInfo.monthIndex && shiftDate.getFullYear() === monthInfo.year;
+                });
+            };
+            
+            const dataForMonth = [];
+            const daysInMonth = new Date(monthInfo.year, monthInfo.monthIndex + 1, 0).getDate();
+            const feiertagChecked = feiertagCheckbox.checked;
 
-            // Daten vorbereiten und Gesamtzeiten berechnen
-            const tableRows = shiftsToExport.map(shift => {
-                const startDateTime = new Date(shift.startTime);
-                const endEntry = shift.log.slice().reverse().find(e => e.action.startsWith('Arbeitsende')); 
-                const endDateTime = endEntry ? new Date(endEntry.time) : null;
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(monthInfo.year, monthInfo.monthIndex, day);
+                const dateOnlyMs = date.setHours(0, 0, 0, 0); 
                 
-                const bruttoTimeMs = endDateTime ? endDateTime.valueOf() - startDateTime.valueOf() : 0;
-                const pauseTimeMs = bruttoTimeMs - shift.netTime;
+                const currentDayDate = new Date(dateOnlyMs);
+                const dayOfWeek = currentDayDate.getDay(); // 0 = So, 6 = Sa
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const isWeekday = (dayOfWeek >= 1 && dayOfWeek <= 5);
                 
-                totalNetTimeMs += shift.netTime;
-                totalBruttoTimeMs += bruttoTimeMs;
-                totalPauseTimeMs += pauseTimeMs;
+                // === Feiertags-Check (SA-weit) ===
+                const isPublicHoliday = isPublicHolidaySA(currentDayDate);
+                
+                const shiftsForDay = getShiftsForDay(day, shiftsToExport);
+                
+                // === Urlaubs-Check ===
+                let isCurrentVacationDay = false;
+                if (vacationData && vacationData.startDateObj && vacationData.endDateObj) {
+                     // Prüfe, ob der Tag im Zeitraum liegt UND ein gültiger Urlaubstag ist (Werktag, kein Feiertag)
+                     if (dateOnlyMs >= vacationData.startDateObj.getTime() && dateOnlyMs <= vacationData.endDateObj.getTime()) {
+                         if (isWeekday && !isPublicHoliday) {
+                             isCurrentVacationDay = true;
+                         }
+                     }
+                }
+                
+                if (shiftsForDay.length > 0) {
+                    // Fall 1: Gearbeitet 
+                    shiftsForDay.forEach(shift => {
+                        const startDateTime = new Date(shift.startTime);
+                        const endEntry = shift.log.slice().reverse().find(e => e.action.startsWith('Arbeitsende')); 
+                        const endDateTime = endEntry ? new Date(endEntry.time) : null;
+                        
+                        let bruttoTimeMs = 0;
+                        let pauseTimeMs = 0;
+                        
+                        if (endDateTime) {
+                            bruttoTimeMs = endDateTime.valueOf() - startDateTime.valueOf();
+                            pauseTimeMs = bruttoTimeMs - shift.netTime;
+                        } else {
+                            // Wenn keine Endzeit geloggt, aber Nettzeit > 0, ist dies ein Fehler oder die Schicht ist aktuell (sollte hier nicht passieren)
+                            return; 
+                        }
+                        
+                        totalNetTimeMs += shift.netTime;
+                        totalBruttoTimeMs += bruttoTimeMs;
+                        totalPauseTimeMs += pauseTimeMs;
+                        
+                        let bemerkungenText = shift.bemerkungen || "";
+                        
+                        // Bemerkung: Feiertag hinzufügen (wenn Checkbox aktiv ODER Feiertag ist)
+                        if (feiertagCheckbox.checked || isPublicHoliday) {
+                            const feiertagText = "Feiertag (Gearbeitet)";
+                            if (!bemerkungenText.toLowerCase().includes(feiertagText.toLowerCase())) {
+                                bemerkungenText = (bemerkungenText ? bemerkungenText + " | " : "") + feiertagText;
+                            }
+                        }
 
-                const schichtID = shift.kennzeichen; 
-                const bemerkungenText = shift.bemerkungen || ""; 
+                        dataForMonth.push({
+                            type: 'shift',
+                            date: currentDayDate,
+                            datumText: currentDayDate.toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit' }),
+                            wochentag: getDayOfWeek(currentDayDate),
+                            kennzeichen: shift.kennzeichen,
+                            von: startDateTime.toLocaleTimeString("de-DE", { hour: '2-digit', minute: '2-digit' }),
+                            bis: endDateTime ? endDateTime.toLocaleTimeString("de-DE", { hour: '2-digit', minute: '2-digit' }) : 'N/A',
+                            brutto: formatTime(bruttoTimeMs),
+                            pause: formatTime(pauseTimeMs),
+                            netto: formatTime(shift.netTime),
+                            bemerkungen: bemerkungenText
+                        });
+                    });
+                } else if (isPublicHoliday && !isWeekend) { 
+                     // Fall 2: Feiertag (ohne Arbeit, aber Werktag)
+                     let bemerkungenText = "Feiertag (Lohnfortzahlung)";
+                     
+                     dataForMonth.push({
+                         type: 'rest',
+                         date: currentDayDate,
+                         datumText: currentDayDate.toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit' }),
+                         wochentag: getDayOfWeek(currentDayDate),
+                         kennzeichen: 'FEIERTAG',
+                         von: '---', bis: '---', brutto: '---', pause: '---', netto: '---', 
+                         bemerkungen: bemerkungenText,
+                         isHolidayEntry: true
+                     });
+                     
+                } else if (isCurrentVacationDay) {
+                     // Fall 3: Urlaubstag (Werktag, keine Arbeit, KEIN Feiertag)
+                     totalDocumentedVacationDays++;
+                     dataForMonth.push({
+                         type: 'vacation',
+                         date: currentDayDate,
+                         datumText: currentDayDate.toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit' }),
+                         wochentag: getDayOfWeek(currentDayDate),
+                         kennzeichen: 'URLAUB',
+                         von: '---', bis: '---', brutto: '---', pause: '---', netto: '---', 
+                         bemerkungen: 'Urlaub'
+                     });
+                } else if (isWeekend) {
+                     // Fall 4: Ruhetag (Wochenende)
+                     dataForMonth.push({
+                         type: 'rest',
+                         date: currentDayDate,
+                         datumText: currentDayDate.toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit' }),
+                         wochentag: getDayOfWeek(currentDayDate),
+                         kennzeichen: 'Ruhetag (WE)',
+                         von: '---', bis: '---', brutto: '---', pause: '---', netto: '---', 
+                         bemerkungen: ''
+                     });
+                }
+            }
 
-                return [
-                    startDateTime.toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit', weekday: 'short' }), 
-                    schichtID, 
-                    startDateTime.toLocaleTimeString("de-DE", { hour: '2-digit', minute: '2-digit' }), 
-                    endDateTime ? endDateTime.toLocaleTimeString("de-DE", { hour: '2-digit', minute: '2-digit' }) : 'N/A', 
-                    formatTime(bruttoTimeMs), 
-                    formatTime(pauseTimeMs), 
-                    formatTime(shift.netTime), 
-                    bemerkungenText 
-                ];
-            });
+            // PDF-Tabelle aufbereiten
+            const tableRows = dataForMonth
+                .sort((a, b) => a.date.getTime() - b.date.getTime()) // Sortierung nach Datum sicherstellen
+                .map(item => [
+                     item.wochentag, 
+                     item.datumText, 
+                     item.kennzeichen, 
+                     item.von, 
+                     item.bis, 
+                     item.brutto, 
+                     item.pause, 
+                     item.netto, 
+                     item.bemerkungen
+                ]);
 
-            // Tabelle definieren (8 Spaltennamen)
-            const tableColumn = ["Datum", "Schicht", "Von", "Bis", "Brutto", "Pause", "Netto", "Bemerkungen"];
+
+            // Tabelle definieren (9 Spaltennamen)
+            const tableColumn = ["Wochentag", "Datum", "Schicht", "Von", "Bis", "Brutto", "Pause", "Netto", "Bemerkungen"];
             const headerStart = 10;
             const titleStart = 30;
 
@@ -330,18 +877,29 @@
             doc.setFontSize(14);
             doc.text(monthInfo.monthName, 14, titleStart + 5); 
             doc.setFontSize(10);
-            doc.text(`01.${monthInfo.key.substring(5, 7)}.${monthInfo.key.substring(0, 4)} - 31.${monthInfo.key.substring(5, 7)}.${monthInfo.key.substring(0, 4)}`, 14, titleStart + 10);
+            const endDateOfMonth = new Date(monthInfo.year, monthInfo.monthIndex + 1, 0);
+            doc.text(`01.${monthInfo.key.substring(5, 7)}.${monthInfo.key.substring(0, 4)} - ${endDateOfMonth.getDate()}.${monthInfo.key.substring(5, 7)}.${monthInfo.key.substring(0, 4)}`, 14, titleStart + 10);
 
             // Fußzeile (Gesamt) definieren
             const tableFoot = [
                 [
-                    { content: "GESAMT:", colSpan: 4, styles: { halign: 'left' } }, 
+                    { content: "GESAMT:", colSpan: 5, styles: { halign: 'left' } }, 
                     { content: formatTime(totalBruttoTimeMs) }, 
                     { content: formatTime(totalPauseTimeMs) }, 
                     { content: formatTime(totalNetTimeMs) },
                     "" 
                 ]
             ];
+            
+            // NEU: Zeile für Urlaubstage hinzufügen
+            if (vacationData) {
+                 const monthTotal = vacationData.totalWorkingDays;
+                
+                 tableFoot.push([
+                    { content: `URLAUBSPLANUNG (${monthTotal} Werktage gesamt, ohne Feiertage):`, colSpan: 5, styles: { halign: 'left', fontStyle: 'normal', textColor: [55, 65, 81] } },
+                    { content: `DOKUMENTIERT IN ${monthInfo.monthName}: ${totalDocumentedVacationDays} Tage`, colSpan: 4, styles: { halign: 'left', fontStyle: 'normal', textColor: [55, 65, 81] } }
+                 ]);
+            }
             
             const tableStartY = 50; 
 
@@ -361,16 +919,17 @@
                 },
                 styles: { fontSize: 9, cellPadding: 2, lineWidth: 0.1, lineColor: 0 },
                 columnStyles: {
-                    0: { cellWidth: 22 }, 
-                    1: { cellWidth: 20 }, 
-                    2: { cellWidth: 14 }, 
-                    3: { cellWidth: 14 }, 
-                    4: { cellWidth: 15, halign: 'center' }, 
+                    0: { cellWidth: 16 }, 
+                    1: { cellWidth: 14 }, 
+                    2: { cellWidth: 30 }, 
+                    3: { cellWidth: 14, halign: 'center' }, 
+                    4: { cellWidth: 14, halign: 'center' }, 
                     5: { cellWidth: 15, halign: 'center' }, 
                     6: { cellWidth: 15, halign: 'center' }, 
-                    7: { cellWidth: 25 } 
+                    7: { cellWidth: 15, halign: 'center' }, 
+                    8: { cellWidth: 40 } 
                 },
-                margin: { top: 10 }
+                margin: { top: 10, left: 14, right: 14 }
             });
             
             const finalY = doc.autoTable.previous.finalY || tableStartY + 10;
@@ -389,61 +948,126 @@
             return pdfBlob;
         }
 
-        // --- HILFSFUNKTION: NUR DOWNLOAD ---
-        function initiateDownload(fileBlob, fileName) {
-            const url = URL.createObjectURL(fileBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+        // --- HAUPTFUNKTIONEN (unverändert, außer initializeStatus) ---
+        
+        function startTimer() {
+             if (timer) clearInterval(timer);
+             timer = setInterval(updateTime, 1000);
         }
 
-        // --- HAUPTFUNKTION: Monatsabrechnung erstellen ---
+        function stopTimer() {
+             if (timer) clearInterval(timer);
+             timer = null;
+        }
 
+        function updateTime() {
+             const now = getCurrentDate().valueOf();
+             let elapsed;
+
+             if (state.isWorking) {
+                 if (state.isPaused) {
+                     elapsed = (now - state.startTime) - state.pauseTime;
+                     if (state.pauseStart) elapsed -= (now - state.pauseStart);
+                 } else {
+                     elapsed = (now - state.startTime) - state.pauseTime;
+                 }
+             } else {
+                 elapsed = 0;
+             }
+
+             uhrEl.textContent = `${formatTimeDetailed(elapsed)} (Nettozeit heute)`;
+             updateUI();
+        }
+
+        function togglePause() {
+             const now = getCurrentDate().valueOf();
+             if (!state.isWorking) return;
+
+             if (!state.isPaused) {
+                 // Pause starten
+                 state.isPaused = true;
+                 state.pauseStart = now;
+                 logAction('Pause Start', getCurrentDate());
+                 stopTimer();
+             } else {
+                 // Pause beenden
+                 state.isPaused = false;
+                 if (state.pauseStart) {
+                     state.pauseTime += now - state.pauseStart;
+                 }
+                 state.pauseStart = null;
+                 logAction('Pause Ende', getCurrentDate());
+                 startTimer();
+             }
+             saveState();
+             updateUI();
+        }
+
+        function updateUI() {
+             if (state.isWorking) {
+                 btnStartStop.textContent = state.isPaused ? "Fortsetzen" : "Speichern & Beenden";
+                 btnStartStop.className = `action-btn w-full font-bold py-3 rounded-lg text-lg ${state.isPaused ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`;
+                 
+                 btnPause.disabled = false;
+                 btnPause.textContent = state.isPaused ? "Weiter" : "Pause";
+                 
+                 statusDiv.textContent = state.isPaused ? "Pausiert" : "Läuft";
+                 statusDiv.className = `status ${state.isPaused ? 'paused' : 'working'}`;
+             } else {
+                 btnStartStop.textContent = "Starten / Speichern";
+                 btnStartStop.className = 'action-btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg text-lg';
+                 
+                 btnPause.disabled = true;
+                 btnPause.textContent = "Pause";
+                 
+                 statusDiv.textContent = "Gestoppt";
+                 statusDiv.className = 'status stopped';
+             }
+             
+             // Update Kennzeichen/Fahrer
+             fahrernameInput.disabled = state.isWorking;
+             kennzeichenSelect.disabled = state.isWorking;
+             feiertagCheckbox.disabled = state.isWorking;
+             vacationToggleCheckbox.disabled = state.isWorking; 
+             
+             // Update Nettozeit, wenn gestoppt
+             if (!state.isWorking && state.startTime) {
+                 const netTime = (getCurrentDate().valueOf() - state.startTime) - state.pauseTime;
+                 uhrEl.textContent = `${formatTimeDetailed(netTime)} (Nettozeit heute)`;
+             } else if (!state.startTime) {
+                 uhrEl.textContent = "00:00:00 (Nettozeit heute)";
+             }
+        }
+        
         async function createMonthSummary() {
             
-             console.log("-> Monatsabrechnung gestartet.");
-             
              if (!isPreviousMonthCompleted()) {
                  alert("Aktion nicht möglich: Die Abrechnung ist nur ab dem 1. Tag des Monats erlaubt.");
                  return;
              }
 
-             const previousMonthInfo = getPreviousMonthKeyInfo(new Date()); 
+             const previousMonthInfo = getPreviousMonthKeyInfo(getCurrentDate()); 
              const shiftsByMonth = JSON.parse(localStorage.getItem(SHIFTS_KEY)) || {};
              const shiftsToExport = shiftsByMonth[previousMonthInfo.key] || [];
-
-             if (shiftsToExport.length === 0) {
-                 alert(`Es wurden keine Schichten für ${previousMonthInfo.monthName} gefunden. Es gibt nichts abzurechnen.`);
-                 return;
-             }
              
-             if (!confirm(`Sicher? Das PDF für ${previousMonthInfo.monthName} mit ${shiftsToExport.length} Schichten wird jetzt heruntergeladen. Die Daten bleiben im Protokoll gespeichert (Archiv).`)) {
+             if (!confirm(`Sicher? Das PDF für ${previousMonthInfo.monthName} mit ${shiftsToExport.length} Schichten (plus Ruhetage) wird jetzt heruntergeladen. Die Daten bleiben im Protokoll gespeichert (Archiv).`)) {
                  return;
              }
             
-            // PDF jetzt generieren
             const fahrerNameClean = fahrernameInput.value.replace(/\s/g, '_');
             const fileName = `Zeiterfassung_${fahrerNameClean}_${previousMonthInfo.key}.pdf`;
             const pdfBlob = await createMonthSummaryPDF(shiftsToExport, previousMonthInfo);
 
-            // 1. Download starten 
             initiateDownload(pdfBlob, fileName); 
             
-            // 2. Monats-Key zur Archivliste hinzufügen (Sperrung)
             let archivedMonths = JSON.parse(localStorage.getItem(ARCHIVED_MONTHS_KEY)) || [];
             if (!archivedMonths.includes(previousMonthInfo.key)) {
                 archivedMonths.push(previousMonthInfo.key);
                 localStorage.setItem(ARCHIVED_MONTHS_KEY, JSON.stringify(archivedMonths));
             }
             
-            // 3. UI neu rendern (Archiv aktualisieren)
             initializeStatus();
 
-            // 4. Finaler Alert
             const userAlertMessage = `
             ===================================================
             ✅ MONATSABRECHNUNG ERSTELLT ✅
@@ -453,295 +1077,101 @@
             
             Das PDF wurde heruntergeladen und heißt:
             "${fileName}" (Im Downloads-Ordner)
-
-            Hinweis: Die Schichtdaten bleiben im Protokoll gespeichert und können über das Dropdown-Menü erneut als PDF abgerufen werden.
             `;
 
             setTimeout(() => {
                  alert(userAlertMessage);
-            }, 500);
+            }, 500); 
+
         }
         
-        // --- FUNKTION: PDF aus Archiv erneut erstellen ---
-        async function recreatePdfFromArchive() {
-             const monthKey = archiveSelect.value;
-             if (!monthKey) {
-                 alert("Bitte wählen Sie einen Monat aus der Archivliste aus.");
-                 return;
-             }
-             
-             const shiftsByMonth = JSON.parse(localStorage.getItem(SHIFTS_KEY)) || {};
-             const shiftsToExport = shiftsByMonth[monthKey] || [];
-             
-             if (shiftsToExport.length === 0) {
-                 alert("Für diesen Monat sind keine Schichtdaten mehr vorhanden.");
-                 return;
-             }
-             
-             const monthInfo = { key: monthKey, monthName: monthKeyToName(monthKey) };
-             const fahrerNameClean = fahrernameInput.value.replace(/\s/g, '_');
-             const fileName = `ARCHIV_Zeiterfassung_${fahrerNameClean}_${monthKey}.pdf`;
-             
-             const pdfBlob = await createMonthSummaryPDF(shiftsToExport, monthInfo);
-             initiateDownload(pdfBlob, fileName);
-             
-             alert(`Archiv-PDF für ${monthInfo.monthName} wurde erneut erstellt und heruntergeladen.`);
-        }
-        
-        // --- HAUPTFUNKTION: ALLE DATEN LÖSCHEN ---
-        function deleteAllData() {
-            if (!confirm("⚠️ WARNUNG: Sind Sie sicher, dass Sie ALLE GESPEICHERTEN SCHICHTDATEN und das ARCHIV unwiderruflich löschen möchten?")) {
-                return;
-            }
-            if (!confirm("⚠️ ZWEITE WARNUNG: Alle lokalen Daten (Schichten, Archiv, Zustand, Kennzeichen) gehen verloren, NUR IHR FAHRERNAME BLEIBT ERHALTEN. Fortfahren?")) {
-                return;
-            }
-
-            // Alle relevanten Keys löschen (außer NAME_KEY)
-            localStorage.removeItem(SHIFTS_KEY);
-            localStorage.removeItem(ARCHIVED_MONTHS_KEY);
-            localStorage.removeItem(STATE_KEY);
-            localStorage.removeItem(KENNZEICHEN_KEY); // <-- Wichtig: Gespeichertes Kennzeichen löschen
-
-            // Zustand zurücksetzen
-            stopTimer(); 
-            state = loadState(); 
-            
-            // Den Namen wieder neu in den localStorage schreiben (falls geändert)
-            localStorage.setItem(NAME_KEY, fahrernameInput.value || ''); 
-            
-            // 🔑 ANFORDERUNG 1: Kennzeichen-Dropdown zurücksetzen
-            resetKennzeichenDropdownSelection(); 
-            
-            initializeStatus(); 
-            renderShiftSummary();
-            
-            alert("✅ Alle Schichtdaten wurden erfolgreich gelöscht. Ihr Name und die Kennzeichenliste blieben erhalten.");
-        }
-
-
-        // --- UNVERÄNDERTE HILFSFUNKTIONEN (Angepasst) ---
-        
-        function populateKennzeichenDropdown() {
-             // Optionen außer dem Platzhalter entfernen
-             Array.from(kennzeichenSelect.options).slice(1).forEach(option => option.remove());
-             
-             // Kennzeichen hinzufügen
-             KENNZEICHEN.forEach(kz => {
-                const option = document.createElement('option');
-                option.value = kz;
-                option.textContent = kz;
-                kennzeichenSelect.appendChild(option);
-            });
-            
-            const storedKennzeichen = localStorage.getItem(KENNZEICHEN_KEY);
-            
-            if (storedKennzeichen) {
-                // Wenn ein Kennzeichen gespeichert ist, dieses auswählen
-                kennzeichenSelect.value = storedKennzeichen;
-            } else {
-                 // Wenn nichts gespeichert ist, den Platzhalter auswählen (value="")
-                 kennzeichenSelect.value = '';
-            }
-            
-            // Event Listener, um die Auswahl zu speichern
-            kennzeichenSelect.addEventListener('change', () => {
-                 localStorage.setItem(KENNZEICHEN_KEY, kennzeichenSelect.value);
-            });
-        }
-        
-        // Fügt das Dropdown-Menü für das Archiv hinzu
-        function populateArchiveDropdown() {
-             Array.from(archiveSelect.options).slice(1).forEach(option => option.remove()); // Vorherige Optionen löschen
-             
-             const archivedMonths = JSON.parse(localStorage.getItem(ARCHIVED_MONTHS_KEY)) || [];
-             
-             // Sortiere die Archiv-Einträge absteigend nach Jahr-Monat (YYYY-MM)
-             archivedMonths.sort().reverse(); 
-             
-             let hasOptions = false;
-
-             archivedMonths.forEach(monthKey => {
-                const option = document.createElement('option');
-                option.value = monthKey;
-                option.textContent = monthKeyToName(monthKey);
-                archiveSelect.appendChild(option);
-                hasOptions = true;
-            });
-            
-            // Logik für den "PDF erneut erstellen" Button
-            btnRecreatePdf.disabled = true; 
-
-            archiveSelect.onchange = () => {
-                btnRecreatePdf.disabled = false; 
-            };
-            
-            if (!hasOptions) {
-                 archiveSelect.innerHTML = '<option value="" disabled selected class="text-gray-500">Keine Abrechnungen im Archiv.</option>';
-                 btnRecreatePdf.disabled = true;
-            }
-        }
-        
-        function updateUI() {
-            let totalTimeMs = 0;
-            const now = Date.now();
-            const currentNetTime = state.startTime ? (now - state.startTime) - state.pauseTime : 0;
-
-            if (state.isWorking) {
-                if (state.isPaused) {
-                    const timeBeforePause = state.pauseStart > 0 ? (state.pauseStart - state.startTime) - state.pauseTime : 0;
-                    totalTimeMs = timeBeforePause; 
-                    statusDiv.className = 'status paused';
-                    statusDiv.textContent = 'In Pause...';
-                    btnPause.textContent = 'Pause beenden';
-                    btnStartStop.textContent = 'Stoppen / Speichern'; 
-                    btnStartStop.disabled = false;
-                } else {
-                    totalTimeMs = currentNetTime;
-                    statusDiv.className = 'status working';
-                    statusDiv.textContent = 'Arbeitet...';
-                    btnPause.textContent = 'Pause';
-                    btnStartStop.textContent = 'Stoppen / Speichern'; 
-                    btnStartStop.disabled = false;
-                }
-            } else {
-                totalTimeMs = currentNetTime > 0 ? currentNetTime : 0; 
-                statusDiv.className = 'status stopped';
-                statusDiv.textContent = `Gestoppt. (Seit ${state.startTime ? new Date(state.startTime).toLocaleTimeString("de-DE").substring(0, 5) : 'Start'})`;
-                btnStartStop.textContent = 'Starten';
-                btnPause.textContent = 'Pause'; 
-                btnPause.disabled = true; 
-            }
-            
-            uhrEl.textContent = formatTimeDetailed(totalTimeMs) + ' (Nettozeit heute)';
-            if (state.isWorking && !state.isPaused) {
-                 btnPause.disabled = false;
-            }
-        }
-        
-        
-        function renderShiftSummary() {
-            const summaryDiv = document.getElementById('shift-summary-list');
-            const shiftsByMonth = JSON.parse(localStorage.getItem(SHIFTS_KEY)) || {};
-            
-            const allShifts = [];
-            for (const monthKey in shiftsByMonth) {
-                 shiftsByMonth[monthKey].forEach(shift => {
-                    allShifts.push({...shift, monthKey: monthKey});
-                });
-            }
-
-            const sortedShifts = allShifts.sort((a, b) => b.startTime - a.startTime); 
-
-            let outputHtml = '';
-            let lastMonthKey = null;
-
-            if (state.startTime && (state.isWorking || state.log.length > 0)) {
-                
-                const currentNetTime = state.startTime ? (Date.now() - state.startTime) - state.pauseTime : 0;
-                const netTime = formatTimeDetailed(currentNetTime);
-                const startDateTime = new Date(state.startTime);
-                
-                const startDate = startDateTime.toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit' });
-                const startHour = startDateTime.toLocaleTimeString("de-DE").substring(0, 5);
-                
-                outputHtml += `
-                    <div class="summary-shift current-shift">
-                        <div class="flex justify-between items-center">
-                            <span class="font-bold text-lg text-yellow-400">${startDate} (AKTUELL)</span>
-                            <span class="text-sm text-yellow-400">Start: ${startHour}</span>
-                        </div>
-                        <div class="mt-1 text-sm text-gray-300">
-                             Fahrzeug: <span class="font-medium">${localStorage.getItem(KENNZEICHEN_KEY) || kennzeichenSelect.value || 'N/A'}</span>
-                        </div>
-                        <div class="mt-2 text-base font-bold text-green-400">
-                            Laufende Nettozeit: ${netTime}
-                        </div>
-                        <p class="text-xs text-red-300 mt-1">Diese Schicht wird automatisch gespeichert, wenn Sie auf "Stoppen / Speichern" klicken.</p>
-                    </div>
-                `;
-            }
-
-            if (sortedShifts.length === 0 && !state.startTime) {
-                 summaryDiv.innerHTML = '<p class="text-gray-400 text-center py-4">Noch keine abgeschlossenen Schichten gespeichert.</p>';
-                 return;
-            }
-
-            // Historische Schichten hinzufügen
-            const archivedMonths = JSON.parse(localStorage.getItem(ARCHIVED_MONTHS_KEY)) || [];
-
-            sortedShifts.forEach(shift => {
-                const monthKey = shift.monthKey;
-                
-                if (monthKey !== lastMonthKey) {
-                    const tempDate = new Date(parseInt(monthKey.substring(0, 4)), parseInt(monthKey.substring(5, 7)) - 1, 1);
-                    const monthName = tempDate.toLocaleDateString("de-DE", { month: 'long', year: 'numeric' });
-                    
-                    const archiveBadge = archivedMonths.includes(monthKey) ? '<span class="text-xs font-normal bg-blue-700 text-white px-2 py-0.5 rounded-full ml-2">ARCHIVIERT</span>' : '';
-                    
-                    outputHtml += `<h3 class="text-xl font-semibold text-white mt-4 mb-2 border-b border-gray-600 pb-1">${monthName} ${archiveBadge}</h3>`;
-                    lastMonthKey = monthKey;
-                }
-
-                const netTime = formatTimeDetailed(shift.netTime);
-                const startDateTime = new Date(shift.startTime);
-                const endEntry = shift.log.slice().reverse().find(e => e.action.startsWith('Arbeitsende')); 
-                const endDateTime = endEntry ? new Date(endEntry.time) : null;
-                
-                const startDate = startDateTime.toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit' });
-                const startHour = startDateTime.toLocaleTimeString("de-DE").substring(0, 5);
-                const endHour = endDateTime ? endDateTime.toLocaleTimeString("de-DE").substring(0, 5) : 'Ende unbekannt';
-                
-                outputHtml += `
-                    <div class="summary-shift">
-                        <div class="flex justify-between items-center">
-                            <span class="font-bold text-lg text-white">${startDate}</span>
-                            <span class="text-sm text-yellow-400">${startHour} - ${endHour}</span>
-                        </div>
-                        <div class="mt-1 text-sm text-gray-300">
-                             Schicht (Fahrzeug): <span class="font-medium">${shift.kennzeichen}</span>
-                        </div>
-                        ${shift.bemerkungen ? `<div class="mt-1 text-sm text-red-300">Bemerkung: <span class="font-medium">${shift.bemerkungen}</span></div>` : ''}
-                        <div class="mt-2 text-base font-bold text-green-400">
-                            Netto-Arbeitszeit: ${netTime}
-                        </div>
-                    </div>
-                `;
-            });
-            
-            summaryDiv.innerHTML = outputHtml;
-        }
-
-        function startTimer() { if (timer) clearInterval(timer); timer = setInterval(updateUI, 1000); updateUI(); }
-        function stopTimer() { if (timer) clearInterval(timer); }
-        
-        /**
-         * ZUSAMMENFASSUNG: Startet, stoppt UND speichert die Schicht (Tag beenden).
-         */
         function startStopTracking() {
-            const now = Date.now();
-            if (kennzeichenSelect.value === '' || fahrernameInput.value.trim() === '') { 
-                 alert("Bitte Namen und Kennzeichen eingeben."); 
+            const now = getCurrentDate().valueOf();
+            const isFeiertag = feiertagCheckbox.checked;
+
+            if (fahrernameInput.value.trim() === '') { 
+                 alert("Bitte Namen eingeben."); 
                  return; 
             }
-            localStorage.setItem(KENNZEICHEN_KEY, kennzeichenSelect.value); 
+            
+            if (kennzeichenSelect.value === '' && !isFeiertag && !state.isWorking) { 
+                 alert("Bitte Kennzeichen auswählen."); 
+                 return; 
+            }
+
+            if (kennzeichenSelect.value !== '') {
+                localStorage.setItem(KENNZEICHEN_KEY, kennzeichenSelect.value); 
+            }
             
             if (!state.isWorking) {
-                 // STARTEN
-                if (state.log.length === 0 || !state.startTime) { state.startTime = now; state.pauseTime = 0; logAction('Arbeitsbeginn', new Date(now)); } 
-                else { logAction('Arbeitsbeginn (Fortsetzung)', new Date(now)); }
+                if (isFeiertag) {
+                    
+                    let bemerkungen = prompt("Geben Sie optional eine Bemerkung für diesen Feiertag (ohne Arbeit) ein:");
+                    const feiertagText = "Feiertag (Keine Arbeitszeit)";
+                    
+                    if (bemerkungen) {
+                         if (!bemerkungen.toLowerCase().includes(feiertagText.toLowerCase())) {
+                             bemerkungen += " | " + feiertagText;
+                         }
+                    } else {
+                        bemerkungen = feiertagText;
+                    }
+
+                    const newShift = {
+                        fahrer: fahrernameInput.value, 
+                        kennzeichen: kennzeichenSelect.value || 'FEIERTAG', 
+                        netTime: 0, 
+                        startTime: now, 
+                        log: [{ action: "Feiertag gespeichert", time: now, timestamp: getCurrentDate().toLocaleString("de-DE") }],
+                        bemerkungen: bemerkungen || '' 
+                    };
+                    
+                    const currentMonthKey = getCurrentMonthKey(); 
+                    let shiftsByMonth = JSON.parse(localStorage.getItem(SHIFTS_KEY)) || {};
+                    
+                    if (!shiftsByMonth[currentMonthKey]) {
+                        shiftsByMonth[currentMonthKey] = [];
+                    }
+                    shiftsByMonth[currentMonthKey].push(newShift);
+                    localStorage.setItem(SHIFTS_KEY, JSON.stringify(shiftsByMonth));
+
+                    resetKennzeichenDropdownSelection(); 
+                    feiertagCheckbox.checked = false;
+                    localStorage.setItem(FEIERTAGE_KEY, 'false'); 
+                    initializeStatus(); 
+                    renderShiftSummary();
+                    
+                    alert(`Feiertag (ohne Arbeit) erfolgreich für heute gespeichert. Bemerkung: "${bemerkungen}"`);
+                    return;
+                }
+                
+                // Normale Arbeitszeiterfassung
+                if (state.log.length === 0 || !state.startTime) { state.startTime = now; state.pauseTime = 0; logAction('Arbeitsbeginn', getCurrentDate()); } 
+                else { logAction('Arbeitsbeginn (Fortsetzung)', getCurrentDate()); }
                 state.isWorking = true; state.isPaused = false; startTimer();
+                
             } else {
-                // STOPPEN UND SPEICHERN (Tag beenden Funktion integriert)
+                // Stoppen und Speichern einer normalen Schicht
                 if (state.isPaused) { togglePause(); } 
                 
                 if (confirm("Möchten Sie die Zeiterfassung stoppen und die Schicht speichern (Tag beenden)?")) {
                     
-                    const bemerkungen = prompt("Geben Sie optional eine Bemerkung für diesen Tag ein:");
+                    let bemerkungen = prompt("Geben Sie optional eine Bemerkung für diesen Tag ein:");
+                    
+                    if (isFeiertag) {
+                         const feiertagText = "Feiertag (Gearbeitet)";
+                         if (bemerkungen) {
+                             if (!bemerkungen.toLowerCase().includes(feiertagText.toLowerCase())) {
+                                 bemerkungen += " | " + feiertagText;
+                             }
+                         } else {
+                             bemerkungen = feiertagText;
+                         }
+                    }
                     
                     if (state.isWorking && state.isPaused && state.pauseStart) { state.pauseTime += now - state.pauseStart; }
                     
-                    logAction('Arbeitsende (Tag beendet)', new Date(now)); 
+                    logAction('Arbeitsende (Tag beendet)', getCurrentDate()); 
                     const netTime = (now - state.startTime) - state.pauseTime;
 
                     const newShift = {
@@ -767,16 +1197,16 @@
                     localStorage.removeItem(STATE_KEY); 
                     state = loadState(); 
                     
-                    // 🔑 ANFORDERUNG 2: Kennzeichen-Dropdown zurücksetzen
                     resetKennzeichenDropdownSelection(); 
+                    feiertagCheckbox.checked = false;
+                    localStorage.setItem(FEIERTAGE_KEY, 'false'); 
                     
                     initializeStatus(); 
                     
                     alert(`Tag beendet! Netto-Arbeitszeit: ${formatTimeDetailed(netTime)} wurde gespeichert.`);
 
                 } else {
-                     // Nur gestoppt, aber nicht gespeichert (Zwischenstopp)
-                    state.isWorking = false; stopTimer(); logAction('Arbeitsende (Zwischenstopp)', new Date(now));
+                    state.isWorking = false; stopTimer(); logAction('Arbeitsende (Zwischenstopp)', getCurrentDate());
                 }
             }
             saveState(); 
@@ -784,25 +1214,195 @@
             renderShiftSummary(); 
         }
         
-        function togglePause() {
-            const now = Date.now();
-            if (!state.isWorking && !state.isPaused) { alert("Bitte zuerst die Arbeit starten oder fortsetzen."); return; }
-            if (!state.isPaused) {
-                state.isPaused = true; state.pauseStart = now; stopTimer(); logAction('Pause Start', new Date(now));
-            } else {
-                if (state.pauseStart) { state.pauseTime += now - state.pauseStart; state.pauseStart = null; }
-                state.isPaused = false; startTimer(); logAction('Pause Ende', new Date(now));
-            }
-            saveState(); 
-            updateUI();
-            renderShiftSummary(); 
+        function populateKennzeichenDropdown() {
+             kennzeichenSelect.innerHTML = '<option value="" disabled selected class="text-gray-500">Kennzeichen auswählen...</option>';
+             KENNZEICHEN.forEach(kz => {
+                 const option = document.createElement('option');
+                 option.value = kz;
+                 option.textContent = kz;
+                 kennzeichenSelect.appendChild(option);
+             });
+             
+             const storedKZ = localStorage.getItem(KENNZEICHEN_KEY);
+             if (storedKZ) {
+                 kennzeichenSelect.value = storedKZ;
+             }
         }
         
+        function renderShiftSummary() {
+            const list = document.getElementById('shift-summary-list');
+            list.innerHTML = '';
+            
+            const shiftsByMonth = JSON.parse(localStorage.getItem(SHIFTS_KEY)) || {};
+            const monthKeys = Object.keys(shiftsByMonth).sort().reverse(); 
+            let totalNetMsAllTime = 0;
+            let totalShiftsCount = 0;
+
+            monthKeys.forEach(monthKey => {
+                 const monthShifts = shiftsByMonth[monthKey] || [];
+                 if (monthShifts.length === 0) return;
+                 
+                 const monthHeader = document.createElement('h4');
+                 monthHeader.className = 'text-lg font-bold text-gray-300 mt-4 mb-2 border-b border-gray-700 pb-1';
+                 monthHeader.textContent = monthKeyToName(monthKey);
+                 list.appendChild(monthHeader);
+                 
+                 monthShifts.sort((a, b) => b.startTime - a.startTime).forEach(shift => {
+                     totalShiftsCount++;
+                     totalNetMsAllTime += shift.netTime;
+
+                     const shiftDate = new Date(shift.startTime).toLocaleDateString("de-DE", { day: '2-digit', month: '2-digit', year: 'numeric' });
+                     let netTime = formatTime(shift.netTime);
+                     let timeDisplay = `Netto: ${netTime}`;
+                     let shiftClass = 'summary-shift';
+
+                     // Detailansicht nur für gearbeitete Schichten
+                     let bruttoTime = 'N/A';
+                     let pauseTime = 'N/A';
+                     const endEntry = shift.log.slice().reverse().find(e => e.action.includes('Arbeitsende'));
+                     
+                     if (endEntry) {
+                          const bruttoTimeMs = endEntry.time - shift.startTime;
+                          const pauseTimeMs = bruttoTimeMs - shift.netTime;
+                          bruttoTime = formatTime(bruttoTimeMs);
+                          pauseTime = formatTime(pauseTimeMs);
+                          
+                          timeDisplay = `Brutto: ${bruttoTime}, Pause: ${pauseTime}, Netto: ${netTime}`;
+                          
+                          if (shift.bemerkungen && shift.bemerkungen.startsWith('Nachtrag:')) {
+                               shiftClass += ' border-left: 4px solid #f97316;'; // Orange für nachträgliche Schichten
+                          }
+                     }
+                      
+                     // Prüfen, ob die Schicht die aktuell laufende ist (nur wenn keine Arbeitsende-Log existiert und sie im State ist)
+                     const shiftEnd = shift.log.find(e => e.action.includes('Arbeitsende'));
+                     if (!shiftEnd && state.isWorking && state.startTime === shift.startTime) {
+                         shiftClass += ' current-shift'; 
+                         const currentNet = (getCurrentDate().valueOf() - state.startTime) - state.pauseTime;
+                         timeDisplay = `LÄUFT AKTUELL (Netto: ${formatTime(currentNet)}) - [Seit ${new Date(shift.startTime).toLocaleTimeString("de-DE")}]`;
+                     }
+
+
+                     const shiftEl = document.createElement('div');
+                     shiftEl.className = shiftClass;
+                     shiftEl.innerHTML = `
+                         <p class="text-sm font-semibold">${shiftDate} | ${shift.kennzeichen}</p>
+                         <p class="text-xs text-gray-400">${timeDisplay}</p>
+                         <p class="text-xs text-blue-400 mt-1">${shift.bemerkungen ? `Bemerkung: ${shift.bemerkungen}` : ''}</p>
+                     `;
+                     list.appendChild(shiftEl);
+                 });
+            });
+            
+            if (totalShiftsCount === 0) {
+                 list.innerHTML = '<p class="text-gray-400">Noch keine abgeschlossenen Schichten gespeichert.</p>';
+            }
+
+            const overallSummary = document.createElement('div');
+            overallSummary.className = 'bg-gray-700 p-3 rounded-lg mt-4';
+            overallSummary.innerHTML = `
+                <p class="text-sm font-bold text-yellow-400">Gesamt-Nettozeit aller gespeicherten Schichten:</p>
+                <p class="text-lg font-extrabold text-white">${formatTimeDetailed(totalNetMsAllTime)}</p>
+            `;
+            list.prepend(overallSummary);
+        }
+
+        function populateArchiveDropdown() {
+             archiveSelect.innerHTML = '<option value="" disabled selected class="text-gray-500">Abrechnungen auswählen...</option>';
+             const archivedMonths = JSON.parse(localStorage.getItem(ARCHIVED_MONTHS_KEY)) || [];
+             
+             const sortedMonths = archivedMonths.sort().reverse();
+             
+             if (sortedMonths.length === 0) {
+                 archiveSelect.disabled = true;
+                 btnRecreatePdf.disabled = true;
+                 return;
+             }
+             
+             archiveSelect.disabled = false;
+             
+             sortedMonths.forEach(monthKey => {
+                 const option = document.createElement('option');
+                 option.value = monthKey;
+                 option.textContent = monthKeyToName(monthKey);
+                 archiveSelect.appendChild(option);
+             });
+             
+             archiveSelect.onchange = () => {
+                btnRecreatePdf.disabled = !archiveSelect.value;
+             };
+        }
+
+        async function recreatePdfFromArchive() {
+            const selectedMonthKey = archiveSelect.value;
+            if (!selectedMonthKey) return;
+            
+            const [year, month] = selectedMonthKey.split('-').map(Number);
+            const monthInfo = {
+                key: selectedMonthKey,
+                year: year,
+                monthIndex: month - 1,
+                monthName: monthKeyToName(selectedMonthKey)
+            };
+            
+            const shiftsByMonth = JSON.parse(localStorage.getItem(SHIFTS_KEY)) || {};
+            const shiftsToExport = shiftsByMonth[selectedMonthKey] || [];
+            
+            if (shiftsToExport.length === 0) {
+                alert(`Keine Schichtdaten für ${monthInfo.monthName} gefunden.`);
+                return;
+            }
+            
+            if (!confirm(`Sicher? Das PDF für ${monthInfo.monthName} wird erneut erstellt.`)) {
+                 return;
+            }
+            
+            const fahrerNameClean = fahrernameInput.value.replace(/\s/g, '_');
+            const fileName = `Zeiterfassung_REPRINT_${fahrerNameClean}_${selectedMonthKey}.pdf`;
+            const pdfBlob = await createMonthSummaryPDF(shiftsToExport, monthInfo);
+
+            initiateDownload(pdfBlob, fileName);
+            alert(`PDF für ${monthInfo.monthName} wurde neu erstellt und heruntergeladen.`);
+        }
+
+        function initiateDownload(blob, fileName) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        function deleteAllData() {
+             if (confirm("WARNUNG: Sind Sie sicher, dass Sie ALLE gespeicherten Schichtdaten, Archive und den aktuellen Timer-Status löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.")) {
+                 localStorage.removeItem(SHIFTS_KEY);
+                 localStorage.removeItem(STATE_KEY);
+                 localStorage.removeItem(ARCHIVED_MONTHS_KEY);
+                 localStorage.removeItem(KENNZEICHEN_KEY);
+                 localStorage.removeItem(FEIERTAGE_KEY);
+                 localStorage.removeItem(VACATION_KEY); 
+                 localStorage.removeItem(VACATION_TOGGLE_KEY);
+                 
+                 stopTimer();
+                 state = loadState();
+                 initializeStatus();
+                 renderShiftSummary();
+                 
+                 alert("Alle Daten erfolgreich gelöscht. Die App ist zurückgesetzt.");
+             }
+        }
+
+        // --- Initialisierung ---
         
         function initializeStatus() {
+             initFeiertagCheckbox(); 
+             initVacationToggle(); 
              populateKennzeichenDropdown();
+             renderVacationInfo(); 
              
-             // Laden des Namens (sollte immer zuerst passieren)
              fahrernameInput.value = localStorage.getItem(NAME_KEY) || '';
              
              fahrernameInput.addEventListener('input', () => {
@@ -813,13 +1413,18 @@
                  }
              });
              
-             // Archiv Dropdown aktualisieren
+             // Setze das Datum im manuellen Eingabeblock auf heute, wenn leer
+             if (!manualDateInput.value) {
+                 const today = new Date();
+                 const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                 manualDateInput.value = todayStr;
+             }
+
              populateArchiveDropdown();
-             
              renderShiftSummary();
              
              const isSummaryAllowed = isPreviousMonthCompleted();
-             const previousMonthInfo = getPreviousMonthKeyInfo(new Date()); 
+             const previousMonthInfo = getPreviousMonthKeyInfo(getCurrentDate()); 
              
              btnMonthSummary.disabled = !isSummaryAllowed; 
              
@@ -828,12 +1433,12 @@
              
              if (isSummaryAllowed) {
                 btnMonthSummary.textContent = `Monatsabrechnung ${previousMonthInfo.monthName} erstellen (PDF)`;
-                summaryInfo.textContent = `Abrechnung für ${previousMonthInfo.monthName} ist erlaubt. (Heute: ${today.getDate()}. ${currentMonth})`;
+                summaryInfo.textContent = `Abrechnung für ${previousMonthInfo.monthName} ist erlaubt.`;
                 summaryInfo.className = 'text-sm text-green-400 text-center mt-2 font-semibold';
              } else {
                 btnMonthSummary.textContent = `Monatsabrechnung ${previousMonthInfo.monthName} erstellen (PDF)`;
                 btnMonthSummary.disabled = true;
-                summaryInfo.textContent = `Abrechnung erst ab dem 1. des Monats möglich. (Heute: ${today.getDate()}. ${currentMonth})`;
+                summaryInfo.textContent = `Abrechnung erst ab dem 1. des Monats möglich. (Aktuelles Datum: ${today.getDate()}. ${currentMonth})`;
                 summaryInfo.className = 'text-sm text-red-400 text-center mt-2 font-semibold';
              }
              
@@ -844,8 +1449,10 @@
              }
         }
         
-        // Beim Laden des Skripts
-        document.addEventListener('DOMContentLoaded', initializeStatus);
+        document.addEventListener('DOMContentLoaded', () => {
+             initializeStatus();
+        });
+        
     </script>
 </body>
 </html>
